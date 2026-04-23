@@ -39,6 +39,10 @@ function gradeOrder(grade: string): number {
   return isNaN(n) ? 998 : n
 }
 
+function initials(name: string) {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+}
+
 export default function TeacherDashboard({ initialQueue, teacherName, allStudents, initialStudentStatuses, initialAbsentIds }: Props) {
   const [queue, setQueue] = useState<QueueEntry[]>(initialQueue)
   const [studentStatuses, setStudentStatuses] = useState<Record<string, 'waiting' | 'picked_up'>>(initialStudentStatuses)
@@ -51,6 +55,9 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
   const [absentIds, setAbsentIds] = useState<Set<string>>(new Set(initialAbsentIds))
   const [absentLoading, setAbsentLoading] = useState<Record<string, boolean>>({})
   const [absentError, setAbsentError] = useState<string | null>(null)
+  const [newEntryIds, setNewEntryIds] = useState<Set<string>>(new Set())
+  const [clearConfirm, setClearConfirm] = useState(false)
+  const [clearing, setClearing] = useState(false)
   const today = new Date().toISOString().split('T')[0]
 
   const supabase = useMemo(() => createClient(), [])
@@ -97,7 +104,20 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
   useEffect(() => {
     const queueChannel = supabase
       .channel('pickup_queue_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pickup_queue' }, () => fetchQueue())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pickup_queue' }, (payload) => {
+        const newId = (payload.new as { id: string }).id
+        setNewEntryIds(prev => new Set([...prev, newId]))
+        setTimeout(() => {
+          setNewEntryIds(prev => {
+            const next = new Set(prev)
+            next.delete(newId)
+            return next
+          })
+        }, 3000)
+        fetchQueue()
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pickup_queue' }, () => fetchQueue())
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'pickup_queue' }, () => fetchQueue())
       .subscribe()
 
     const absenceChannel = supabase
@@ -160,19 +180,34 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
     }
   }
 
+  async function clearAllAbsences() {
+    setClearing(true)
+    try {
+      const res = await fetch('/api/absences/clear', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: today }),
+      })
+      if (res.ok) {
+        setAbsentIds(new Set())
+        setClearConfirm(false)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setAbsentError(data.error ?? 'Could not clear absences')
+      }
+    } catch {
+      setAbsentError('Network error — check your connection')
+    } finally {
+      setClearing(false)
+    }
+  }
+
   function formatTime(iso: string) {
     return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
   function waitingMinutes(iso: string) {
     return Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  }
-
-  const statusOrder = (id: string) => {
-    const s = studentStatuses[id]
-    if (s === 'waiting') return 0
-    if (s === 'picked_up') return 1
-    return 2
   }
 
   const searchedStudents = allStudents.filter(s =>
@@ -197,25 +232,20 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
   }
 
   const sidebarStudents = useMemo(() => {
-    const present = searchedStudents.filter(s => !absentIds.has(s.id))
     const absent = searchedStudents.filter(s => absentIds.has(s.id))
+    const present = searchedStudents.filter(s => !absentIds.has(s.id))
 
     if (sidebarFilter === 'absent') return [...sortStudents(absent), ...sortStudents(present)]
     if (sidebarFilter === 'waiting') return sortStudents(present.filter(s => studentStatuses[s.id] === 'waiting'))
     if (sidebarFilter === 'picked_up') return sortStudents(present.filter(s => studentStatuses[s.id] === 'picked_up'))
     if (sidebarFilter === 'not_yet') return sortStudents(present.filter(s => !studentStatuses[s.id]))
 
-    // 'all': group by status (waiting → picked_up → not_yet → absent), sort within groups
     const waiting = sortStudents(present.filter(s => studentStatuses[s.id] === 'waiting'))
     const pickedUp = sortStudents(present.filter(s => studentStatuses[s.id] === 'picked_up'))
     const notYet = sortStudents(present.filter(s => !studentStatuses[s.id]))
     return [...waiting, ...pickedUp, ...notYet, ...sortStudents(absent)]
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchedStudents, absentIds, sidebarFilter, sidebarSort, studentStatuses])
-
-  function toggleFilter(f: SidebarFilter) {
-    setSidebarFilter(prev => prev === f ? 'all' : f)
-  }
 
   const sortedQueue = useMemo(() => {
     if (queueSort === 'grade') {
@@ -224,7 +254,7 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
         return gDiff !== 0 ? gDiff : (a.students?.full_name ?? '').localeCompare(b.students?.full_name ?? '')
       })
     }
-    return queue // already sorted by arrived_at from the query
+    return queue
   }, [queue, queueSort])
 
   return (
@@ -244,28 +274,34 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
             </button>
           </div>
 
-          {/* Clickable filter badges */}
+          {/* Filter badges */}
           <div className="flex gap-1.5 text-xs mb-3 flex-wrap">
             <button
-              onClick={() => toggleFilter('picked_up')}
+              onClick={() => setSidebarFilter('all')}
+              className={`px-2 py-0.5 rounded-full transition-colors ${sidebarFilter === 'all' ? 'bg-gray-700 dark:bg-gray-200 text-white dark:text-gray-900' : 'bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setSidebarFilter(prev => prev === 'picked_up' ? 'all' : 'picked_up')}
               className={`px-2 py-0.5 rounded-full transition-colors ${sidebarFilter === 'picked_up' ? 'bg-green-600 text-white' : 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/60'}`}
             >
               ✅ {pickedUpCount} picked up
             </button>
             <button
-              onClick={() => toggleFilter('waiting')}
+              onClick={() => setSidebarFilter(prev => prev === 'waiting' ? 'all' : 'waiting')}
               className={`px-2 py-0.5 rounded-full transition-colors ${sidebarFilter === 'waiting' ? 'bg-amber-500 text-white' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/60'}`}
             >
               ⏳ {waitingCount} waiting
             </button>
             <button
-              onClick={() => toggleFilter('not_yet')}
+              onClick={() => setSidebarFilter(prev => prev === 'not_yet' ? 'all' : 'not_yet')}
               className={`px-2 py-0.5 rounded-full transition-colors ${sidebarFilter === 'not_yet' ? 'bg-red-600 text-white' : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/60'}`}
             >
               🔴 {notYetCount} not yet
             </button>
             <button
-              onClick={() => toggleFilter('absent')}
+              onClick={() => setSidebarFilter(prev => prev === 'absent' ? 'all' : 'absent')}
               className={`px-2 py-0.5 rounded-full transition-colors ${sidebarFilter === 'absent' ? 'bg-orange-500 text-white' : 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/60'}`}
             >
               🤒 {absentCount} absent
@@ -285,25 +321,28 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
           {sidebarStudents.map(student => {
             const isAbsent = absentIds.has(student.id)
             const status = studentStatuses[student.id]
-            const isPickedUp = !isAbsent && status === 'picked_up'
+            const isPickedUp = status === 'picked_up'
             const isWaiting = !isAbsent && status === 'waiting'
+            const isAbsentAndPickedUp = isAbsent && isPickedUp
 
             return (
               <div
                 key={student.id}
                 className={`group rounded-lg px-3 py-2.5 border transition-colors ${
-                  isAbsent     ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800'
-                  : isPickedUp ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-                  : isWaiting  ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
-                  :              'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                  isAbsentAndPickedUp ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
+                  : isAbsent         ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800'
+                  : isPickedUp       ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                  : isWaiting        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                  :                    'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <p className={`font-medium text-sm ${
-                    isAbsent     ? 'text-orange-700 dark:text-orange-300'
-                    : isPickedUp ? 'text-green-800 dark:text-green-300'
-                    : isWaiting  ? 'text-amber-800 dark:text-amber-300'
-                    :              'text-red-800 dark:text-red-300'
+                    isAbsentAndPickedUp ? 'text-purple-700 dark:text-purple-300'
+                    : isAbsent         ? 'text-orange-700 dark:text-orange-300'
+                    : isPickedUp       ? 'text-green-800 dark:text-green-300'
+                    : isWaiting        ? 'text-amber-800 dark:text-amber-300'
+                    :                    'text-red-800 dark:text-red-300'
                   }`}>
                     {student.full_name}
                   </p>
@@ -323,20 +362,22 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
                       </button>
                     )}
                     <span className="text-base">
-                      {isAbsent ? '🟠' : isPickedUp ? '✅' : isWaiting ? '⏳' : '🔴'}
+                      {isAbsentAndPickedUp ? '🟣' : isAbsent ? '🟠' : isPickedUp ? '✅' : isWaiting ? '⏳' : '🔴'}
                     </span>
                   </div>
                 </div>
                 <p className={`text-xs mt-0.5 ${
-                  isAbsent     ? 'text-orange-500 dark:text-orange-400'
-                  : isPickedUp ? 'text-green-600 dark:text-green-400'
-                  : isWaiting  ? 'text-amber-600 dark:text-amber-400'
-                  :              'text-red-500 dark:text-red-400'
+                  isAbsentAndPickedUp ? 'text-purple-500 dark:text-purple-400'
+                  : isAbsent         ? 'text-orange-500 dark:text-orange-400'
+                  : isPickedUp       ? 'text-green-600 dark:text-green-400'
+                  : isWaiting        ? 'text-amber-600 dark:text-amber-400'
+                  :                    'text-red-500 dark:text-red-400'
                 }`}>
                   {student.grade && `Grade ${student.grade}`}
                   {student.grade && student.class_name && ' · '}
                   {student.class_name}
-                  {isAbsent && ' · Absent today'}
+                  {isAbsentAndPickedUp && ' · Absent — also picked up'}
+                  {isAbsent && !isAbsentAndPickedUp && ' · Absent today'}
                 </p>
               </div>
             )
@@ -346,6 +387,41 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
             <p className="text-center text-xs text-gray-400 dark:text-gray-500 py-6">No students match this filter.</p>
           )}
         </div>
+
+        {/* Clear All Absences */}
+        {absentIds.size > 0 && (
+          <div className="p-3 border-t border-gray-100 dark:border-gray-700">
+            {clearConfirm ? (
+              <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-3">
+                <p className="text-xs text-orange-700 dark:text-orange-300 font-medium mb-2">
+                  Clear all {absentIds.size} absent mark{absentIds.size !== 1 ? 's' : ''} for today?
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={clearAllAbsences}
+                    disabled={clearing}
+                    className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white text-xs font-semibold rounded-lg py-1.5 transition-colors"
+                  >
+                    {clearing ? 'Clearing…' : 'Yes, clear all'}
+                  </button>
+                  <button
+                    onClick={() => setClearConfirm(false)}
+                    className="flex-1 border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 text-xs rounded-lg py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setClearConfirm(true)}
+                className="w-full text-xs text-orange-500 dark:text-orange-400 border border-orange-200 dark:border-orange-700 rounded-lg py-1.5 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+              >
+                Clear all absences
+              </button>
+            )}
+          </div>
+        )}
       </aside>
 
       {/* Main area */}
@@ -408,46 +484,61 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
                 const parent = entry.profiles
                 const waited = waitingMinutes(entry.arrived_at)
                 const isStudentAbsent = student?.id ? absentIds.has(student.id) : false
+                const isNew = newEntryIds.has(entry.id)
+                const prevEntry = index > 0 ? sortedQueue[index - 1] : null
+                const showGradeDivider = queueSort === 'grade' && student?.grade !== prevEntry?.students?.grade
 
                 return (
-                  <div
-                    key={entry.id}
-                    className={`bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border flex items-center gap-4 ${
-                      isStudentAbsent ? 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20'
-                      : waited >= 5   ? 'border-amber-300 dark:border-amber-700'
-                      :                 'border-gray-100 dark:border-gray-700'
-                    }`}
-                  >
-                    <div className={`w-9 h-9 rounded-full text-white flex items-center justify-center font-bold text-sm shrink-0 ${
-                      isStudentAbsent ? 'bg-orange-400' : 'bg-blue-600'
-                    }`}>
-                      {isStudentAbsent ? '🤒' : index + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-gray-900 dark:text-white text-base">{student?.full_name ?? 'Unknown'}</p>
-                      <p className="text-gray-500 dark:text-gray-400 text-sm">
-                        {student?.grade && `Grade ${student.grade}`}
-                        {student?.grade && student?.class_name && ' · '}
-                        {student?.class_name}
-                      </p>
-                      <p className="text-gray-400 dark:text-gray-500 text-xs mt-0.5">
-                        Parent: {parent?.full_name ?? '—'} · Arrived {formatTime(entry.arrived_at)}
-                        {isStudentAbsent && <span className="text-orange-500 ml-1">· Marked absent</span>}
-                        {!isStudentAbsent && waited >= 5 && <span className="text-amber-500 ml-1">· Waiting {waited}m</span>}
-                      </p>
-                    </div>
-                    {entry.location_verified && (
-                      <span className="text-green-600 dark:text-green-400 text-xs bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded-full shrink-0">
-                        📍 Verified
-                      </span>
+                  <div key={entry.id}>
+                    {showGradeDivider && (
+                      <div className="flex items-center gap-2 py-1 mb-1">
+                        <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+                        <span className="text-xs text-gray-400 dark:text-gray-500 font-medium px-1">
+                          {student?.grade ? `Grade ${student.grade}` : 'Unknown Grade'}
+                        </span>
+                        <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+                      </div>
                     )}
-                    <button
-                      onClick={() => markPickedUp(entry.id)}
-                      disabled={marking[entry.id]}
-                      className="shrink-0 bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white font-semibold text-sm rounded-lg px-4 py-2.5 transition-colors"
+                    <div
+                      className={`bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border flex items-center gap-4 ${
+                        isNew           ? 'border-blue-300 dark:border-blue-600 queue-entry-new'
+                        : isStudentAbsent ? 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20'
+                        : waited >= 5   ? 'border-amber-300 dark:border-amber-700'
+                        :                 'border-gray-100 dark:border-gray-700'
+                      }`}
                     >
-                      {marking[entry.id] ? '…' : 'Picked Up ✓'}
-                    </button>
+                      <div className={`w-9 h-9 rounded-full text-white flex items-center justify-center font-bold text-sm shrink-0 ${
+                        isStudentAbsent ? 'bg-orange-400 text-lg' : 'bg-blue-600'
+                      }`}>
+                        {isStudentAbsent ? '🤒' : initials(student?.full_name ?? '?')}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-gray-900 dark:text-white text-base">{student?.full_name ?? 'Unknown'}</p>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">
+                          {student?.grade && `Grade ${student.grade}`}
+                          {student?.grade && student?.class_name && ' · '}
+                          {student?.class_name}
+                        </p>
+                        <p className="text-gray-400 dark:text-gray-500 text-xs mt-0.5">
+                          Parent: <span className="font-medium text-gray-500 dark:text-gray-400">{parent?.full_name || '—'}</span>
+                          {' · '}Arrived {formatTime(entry.arrived_at)}
+                          {isStudentAbsent && <span className="text-orange-500 ml-1">· Marked absent</span>}
+                          {!isStudentAbsent && waited >= 5 && <span className="text-amber-500 ml-1">· Waiting {waited}m</span>}
+                        </p>
+                      </div>
+                      {entry.location_verified && (
+                        <span className="text-green-600 dark:text-green-400 text-xs bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded-full shrink-0">
+                          📍 Verified
+                        </span>
+                      )}
+                      <button
+                        onClick={() => markPickedUp(entry.id)}
+                        disabled={marking[entry.id]}
+                        className="shrink-0 bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white font-semibold text-sm rounded-lg px-4 py-2.5 transition-colors"
+                      >
+                        {marking[entry.id] ? '…' : 'Picked Up ✓'}
+                      </button>
+                    </div>
                   </div>
                 )
               })}

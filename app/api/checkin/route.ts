@@ -16,7 +16,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  // Verify parent owns this student
   const { data: link } = await supabase
     .from('parent_students')
     .select('student_id')
@@ -28,24 +27,47 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Student not linked to your account' }, { status: 403 })
   }
 
-  // Check school location
-  const { data: settings } = await supabase
-    .from('school_settings')
-    .select('lat, lng, radius_meters')
-    .single()
+  // Check against all configured school locations
+  const { data: locations } = await supabase
+    .from('school_locations')
+    .select('lat, lng, radius_meters, name')
 
+  // Fall back to legacy school_settings if no locations configured yet
   let locationVerified = false
-  if (settings) {
-    const distance = getDistanceMeters(lat, lng, settings.lat, settings.lng)
-    locationVerified = distance <= settings.radius_meters
+  if (locations && locations.length > 0) {
+    for (const loc of locations) {
+      const distance = getDistanceMeters(lat, lng, loc.lat, loc.lng)
+      if (distance <= loc.radius_meters) {
+        locationVerified = true
+        break
+      }
+    }
     if (!locationVerified) {
+      const closestDist = Math.min(
+        ...locations.map(loc => getDistanceMeters(lat, lng, loc.lat, loc.lng))
+      )
       return NextResponse.json({
-        error: `You don't appear to be at school yet. You are ${Math.round(distance)}m away (limit: ${settings.radius_meters}m).`,
+        error: `You don't appear to be at school yet. You are ${Math.round(closestDist)}m from the nearest pickup location.`,
       }, { status: 422 })
+    }
+  } else {
+    // Fallback to legacy school_settings
+    const { data: settings } = await supabase
+      .from('school_settings')
+      .select('lat, lng, radius_meters')
+      .single()
+
+    if (settings) {
+      const distance = getDistanceMeters(lat, lng, settings.lat, settings.lng)
+      locationVerified = distance <= settings.radius_meters
+      if (!locationVerified) {
+        return NextResponse.json({
+          error: `You don't appear to be at school yet. You are ${Math.round(distance)}m away (limit: ${settings.radius_meters}m).`,
+        }, { status: 422 })
+      }
     }
   }
 
-  // Prevent duplicate check-ins within the same calendar day
   const today = new Date().toISOString().split('T')[0]
   const { data: existing } = await supabase
     .from('pickup_queue')
@@ -54,6 +76,7 @@ export async function POST(req: NextRequest) {
     .eq('student_id', student_id)
     .gte('arrived_at', `${today}T00:00:00`)
     .maybeSingle()
+
   if (existing) {
     return NextResponse.json({
       error: existing.status === 'waiting'

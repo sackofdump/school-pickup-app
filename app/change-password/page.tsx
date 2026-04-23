@@ -1,10 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 
 export default function ChangePasswordPage() {
-  const router = useRouter()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
@@ -16,8 +14,8 @@ export default function ChangePasswordPage() {
       setError('Passwords do not match.')
       return
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.')
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.')
       return
     }
 
@@ -37,7 +35,8 @@ export default function ChangePasswordPage() {
       return
     }
 
-    router.replace('/parent')
+    // Hard redirect so the updated session cookie is read fresh by the server
+    window.location.href = '/parent'
   }
 
   return (
@@ -58,8 +57,8 @@ export default function ChangePasswordPage() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
-              minLength={6}
-              placeholder="At least 6 characters"
+              minLength={8}
+              placeholder="At least 8 characters"
               className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>

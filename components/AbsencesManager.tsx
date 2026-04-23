@@ -22,8 +22,33 @@ export default function AbsencesManager({ students: initial, date, backHref }: P
   const [loading, setLoading] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [clearConfirm, setClearConfirm] = useState(false)
+  const [clearing, setClearing] = useState(false)
 
   const absentStudents = students.filter(s => s.absent)
+
+  async function clearAll() {
+    setClearing(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/absences/clear', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date }),
+      })
+      if (res.ok) {
+        setStudents(prev => prev.map(s => ({ ...s, absent: false })))
+        setClearConfirm(false)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error ?? 'Could not clear absences.')
+      }
+    } catch {
+      setError('Network error — check your connection.')
+    } finally {
+      setClearing(false)
+    }
+  }
 
   async function toggle(student: Student) {
     setLoading(prev => ({ ...prev, [student.id]: true }))
@@ -83,10 +108,42 @@ export default function AbsencesManager({ students: initial, date, backHref }: P
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-orange-200 dark:border-orange-800 shadow-sm mb-6 overflow-hidden">
           <div className="bg-orange-50 dark:bg-orange-900/30 px-4 py-3 border-b border-orange-100 dark:border-orange-800 flex items-center justify-between">
             <p className="font-semibold text-orange-800 dark:text-orange-300">Absent Today</p>
-            <span className="text-sm font-bold text-orange-700 dark:text-orange-400">
-              {absentStudents.length === 0 ? 'None' : `${absentStudents.length} student${absentStudents.length === 1 ? '' : 's'}`}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-orange-700 dark:text-orange-400">
+                {absentStudents.length === 0 ? 'None' : `${absentStudents.length} student${absentStudents.length === 1 ? '' : 's'}`}
+              </span>
+              {absentStudents.length > 0 && !clearConfirm && (
+                <button
+                  onClick={() => setClearConfirm(true)}
+                  className="text-xs text-orange-500 dark:text-orange-400 border border-orange-300 dark:border-orange-600 rounded-lg px-2 py-1 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
+          {clearConfirm && (
+            <div className="bg-orange-50 dark:bg-orange-900/20 px-4 py-3 border-b border-orange-100 dark:border-orange-800 flex items-center justify-between gap-3">
+              <p className="text-sm text-orange-700 dark:text-orange-300">
+                Remove all {absentStudents.length} absent marks for today?
+              </p>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={clearAll}
+                  disabled={clearing}
+                  className="text-xs bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-semibold rounded-lg px-3 py-1.5 transition-colors"
+                >
+                  {clearing ? 'Clearing…' : 'Yes, clear'}
+                </button>
+                <button
+                  onClick={() => setClearConfirm(false)}
+                  className="text-xs border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 rounded-lg px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           {absentStudents.length === 0 ? (
             <p className="px-4 py-5 text-sm text-gray-400 dark:text-gray-500 text-center">No one marked absent yet.</p>
           ) : (

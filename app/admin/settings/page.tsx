@@ -15,10 +15,5 @@ export default async function SettingsPage() {
 
   if (profile?.role !== 'admin') redirect('/login')
 
-  const { data: settings } = await supabase
-    .from('school_settings')
-    .select('*')
-    .single()
-
-  return <SchoolSettings settings={settings} />
+  return <SchoolSettings />
 }

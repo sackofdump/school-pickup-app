@@ -10,18 +10,30 @@ interface Props {
   students: Student[]
   queueMap: Record<string, string>
   initialAbsentIds: string[]
+  pendingRequest?: { id: string; child_first_name: string; child_last_name: string; status: string } | null
 }
 
 function getSuccessMessage() {
   return new Date().getDay() === 5 ? 'Success! See you Monday!' : 'Success! See you tomorrow!'
 }
 
-export default function ParentHome({ profile, students, queueMap, initialAbsentIds }: Props) {
+function firstName(fullName: string) {
+  return fullName.split(' ')[0]
+}
+
+export default function ParentHome({ profile, students, queueMap, initialAbsentIds, pendingRequest: initialPendingRequest }: Props) {
   const [statuses, setStatuses] = useState<Record<string, string>>(queueMap)
   const [absentIds] = useState<Set<string>>(new Set(initialAbsentIds))
   const [loading, setLoading] = useState<Record<string, boolean>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [justPickedUp, setJustPickedUp] = useState<Record<string, boolean>>({})
+
+  // Pending request state (when parent has no linked children)
+  const [pendingRequest, setPendingRequest] = useState(initialPendingRequest ?? null)
+  const [requestFirstName, setRequestFirstName] = useState('')
+  const [requestLastName, setRequestLastName] = useState('')
+  const [requestLoading, setRequestLoading] = useState(false)
+  const [requestError, setRequestError] = useState('')
 
   const supabase = useMemo(() => createClient(), [])
 
@@ -71,7 +83,6 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
       )
       .subscribe()
 
-    // Polling fallback every 5s so the success message always appears even if real-time drops
     const poll = setInterval(fetchStatuses, 5000)
 
     return () => {
@@ -117,6 +128,30 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
     }
   }
 
+  async function handleRequestSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setRequestLoading(true)
+    setRequestError('')
+
+    try {
+      const res = await fetch('/api/pending-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ child_first_name: requestFirstName.trim(), child_last_name: requestLastName.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setRequestError(data.error ?? 'Something went wrong.')
+      } else {
+        setPendingRequest(data.request)
+      }
+    } catch {
+      setRequestError('Network error — check your connection.')
+    } finally {
+      setRequestLoading(false)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-blue-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-4 py-4 flex items-center justify-between">
@@ -133,11 +168,52 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
         <h2 className="text-base font-semibold text-gray-700 dark:text-gray-300 mb-3">Your children</h2>
 
         {students.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 text-center text-gray-400 dark:text-gray-500 shadow-sm">
-            <p className="text-4xl mb-3">👦</p>
-            <p>No children linked to your account yet.</p>
-            <p className="text-sm mt-1">Contact the school admin to get set up.</p>
-          </div>
+          pendingRequest ? (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 text-center shadow-sm border border-amber-200 dark:border-amber-700">
+              <p className="text-4xl mb-3">⏳</p>
+              <p className="font-semibold text-amber-700 dark:text-amber-400 mb-1">Request pending</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm">
+                Your request to add <strong>{pendingRequest.child_first_name} {pendingRequest.child_last_name}</strong> is
+                waiting for admin approval. You will receive an email once confirmed.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+              <p className="text-4xl mb-3 text-center">👦</p>
+              <p className="text-center font-semibold text-gray-800 dark:text-gray-100 mb-1">Add your child</p>
+              <p className="text-center text-sm text-gray-500 dark:text-gray-400 mb-5">
+                Enter your child's name. The school admin will confirm the link.
+              </p>
+              <form onSubmit={handleRequestSubmit} className="space-y-3">
+                <input
+                  type="text"
+                  value={requestFirstName}
+                  onChange={e => setRequestFirstName(e.target.value)}
+                  required
+                  placeholder="Child's first name"
+                  className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                <input
+                  type="text"
+                  value={requestLastName}
+                  onChange={e => setRequestLastName(e.target.value)}
+                  required
+                  placeholder="Child's last name"
+                  className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                {requestError && (
+                  <p className="text-red-500 text-sm bg-red-50 dark:bg-red-900/30 rounded-lg px-3 py-2">{requestError}</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={requestLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-lg py-3 text-sm transition-colors"
+                >
+                  {requestLoading ? 'Submitting…' : 'Submit Request'}
+                </button>
+              </form>
+            </div>
+          )
         ) : (
           <div className="space-y-3">
             {students.map(student => {
@@ -174,7 +250,9 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
                       <span className="text-amber-500 text-lg">⏳</span>
                       <div>
                         <p className="font-semibold text-amber-700 dark:text-amber-400 text-sm">You're in the queue!</p>
-                        <p className="text-amber-600 dark:text-amber-500 text-xs">A teacher will bring {student.full_name} out shortly.</p>
+                        <p className="text-amber-600 dark:text-amber-500 text-xs">
+                          <span className="font-medium">{firstName(student.full_name)}</span> will be out shortly.
+                        </p>
                       </div>
                     </div>
                   ) : status === 'picked_up' ? (

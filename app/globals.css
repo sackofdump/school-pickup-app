@@ -9,3 +9,13 @@ html, body {
 @media (prefers-color-scheme: dark) {
   html, body { color-scheme: dark; }
 }
+
+@keyframes queue-glow {
+  0%   { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.8); }
+  40%  { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0.25); }
+  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+.queue-entry-new {
+  animation: queue-glow 1.2s ease-out 2;
+}

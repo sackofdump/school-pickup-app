@@ -179,3 +179,69 @@ create policy "Absences are readable by teachers and admins"
   using (current_user_role() in ('teacher', 'admin'));
 
 alter publication supabase_realtime add table public.absences;
+
+-- ============================================================
+-- School Locations (multiple pickup zones)
+-- Run this migration after initial schema if needed.
+-- ============================================================
+create table if not exists public.school_locations (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  lat double precision not null default 0,
+  lng double precision not null default 0,
+  radius_meters int not null default 150,
+  created_at timestamptz default now()
+);
+
+alter table public.school_locations enable row level security;
+
+create policy "Authenticated users read locations"
+  on public.school_locations for select
+  using (auth.uid() is not null);
+
+create policy "Admins manage locations"
+  on public.school_locations for all
+  using (current_user_role() = 'admin');
+
+-- Migrate existing school_settings row into school_locations (run once)
+-- insert into public.school_locations (name, lat, lng, radius_meters)
+-- select name, lat, lng, radius_meters from public.school_settings where lat != 0;
+
+-- ============================================================
+-- Pending student link requests
+-- ============================================================
+create table if not exists public.pending_student_requests (
+  id uuid primary key default gen_random_uuid(),
+  parent_id uuid not null references public.profiles(id) on delete cascade,
+  child_first_name text not null,
+  child_last_name text not null,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamptz default now(),
+  resolved_at timestamptz,
+  resolved_by uuid references public.profiles(id)
+);
+
+alter table public.pending_student_requests enable row level security;
+
+create policy "Parents read own requests"
+  on public.pending_student_requests for select
+  using (parent_id = auth.uid() or current_user_role() = 'admin');
+
+create policy "Parents insert own requests"
+  on public.pending_student_requests for insert
+  with check (parent_id = auth.uid());
+
+create policy "Admins manage pending requests"
+  on public.pending_student_requests for all
+  using (current_user_role() = 'admin');
+
+-- ============================================================
+-- Auto-clear absences daily at 4pm CST (21:00 UTC Mon–Fri)
+-- Requires pg_cron extension (Supabase Pro plans).
+-- Enable extension first: CREATE EXTENSION IF NOT EXISTS pg_cron;
+-- ============================================================
+-- select cron.schedule(
+--   'clear-daily-absences',
+--   '0 21 * * 1-5',
+--   $$delete from public.absences where date = current_date$$
+-- );

@@ -15,7 +15,6 @@ export default async function ParentPage() {
 
   if (profile?.role !== 'parent') redirect(`/${profile?.role ?? 'login'}`)
 
-  // Fetch linked children
   const { data: links } = await supabase
     .from('parent_students')
     .select('student_id, students(id, full_name, grade, class_name)')
@@ -23,7 +22,6 @@ export default async function ParentPage() {
 
   const students = (links ?? []).map((l: any) => l.students).filter(Boolean)
 
-  // Fetch today's queue entries for this parent
   const today = new Date().toISOString().split('T')[0]
   const { data: queueEntries } = await supabase
     .from('pickup_queue')
@@ -36,7 +34,6 @@ export default async function ParentPage() {
     queueMap[entry.student_id] = entry.status
   }
 
-  // Fetch today's absences for linked students
   const studentIds = students.map((s: any) => s.id)
   const { data: absenceEntries } = studentIds.length
     ? await supabase.from('absences').select('student_id').eq('date', today).in('student_id', studentIds)
@@ -44,12 +41,27 @@ export default async function ParentPage() {
 
   const absentIds = (absenceEntries ?? []).map((a: any) => a.student_id)
 
+  // Fetch pending link request if parent has no linked children
+  let pendingRequest = null
+  if (students.length === 0) {
+    const { data: pending } = await supabase
+      .from('pending_student_requests')
+      .select('id, child_first_name, child_last_name, status')
+      .eq('parent_id', user.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    pendingRequest = pending
+  }
+
   return (
     <ParentHome
       profile={profile}
       students={students}
       queueMap={queueMap}
       initialAbsentIds={absentIds}
+      pendingRequest={pendingRequest}
     />
   )
 }

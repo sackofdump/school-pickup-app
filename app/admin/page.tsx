@@ -16,9 +16,10 @@ export default async function AdminPage() {
 
   if (profile?.role !== 'admin') redirect('/login')
 
-  const [{ count: studentCount }, { count: parentCount }] = await Promise.all([
+  const [{ count: studentCount }, { count: parentCount }, { count: pendingCount }] = await Promise.all([
     supabase.from('students').select('*', { count: 'exact', head: true }),
     supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'parent'),
+    supabase.from('pending_student_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
   ])
 
   return (
@@ -73,6 +74,27 @@ export default async function AdminPage() {
           </Link>
 
           <Link
+            href="/admin/pending-requests"
+            className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-purple-300 dark:hover:border-purple-600 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🔗</span>
+              <div>
+                <p className="font-semibold text-gray-800 dark:text-gray-100">Pending Link Requests</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">Parents waiting for a student to be confirmed</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {(pendingCount ?? 0) > 0 && (
+                <span className="bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                  {pendingCount}
+                </span>
+              )}
+              <span className="text-gray-400 dark:text-gray-500">›</span>
+            </div>
+          </Link>
+
+          <Link
             href="/admin/absences"
             className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-orange-300 dark:hover:border-orange-600 transition-colors"
           >
@@ -107,8 +129,8 @@ export default async function AdminPage() {
             <div className="flex items-center gap-3">
               <span className="text-2xl">📍</span>
               <div>
-                <p className="font-semibold text-gray-800 dark:text-gray-100">School Location</p>
-                <p className="text-gray-500 dark:text-gray-400 text-sm">Set GPS coordinates and pickup radius</p>
+                <p className="font-semibold text-gray-800 dark:text-gray-100">School Locations</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">Manage pickup zones and GPS radii</p>
               </div>
             </div>
             <span className="text-gray-400 dark:text-gray-500">›</span>
