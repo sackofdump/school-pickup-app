@@ -30,6 +30,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json(
+      { error: 'SUPABASE_SERVICE_ROLE_KEY is not configured on the server.' },
+      { status: 500 }
+    )
+  }
+
   const { rows }: { rows: ImportRow[] } = await req.json()
   if (!rows?.length) {
     return NextResponse.json({ error: 'No rows provided' }, { status: 400 })
@@ -43,60 +50,62 @@ export async function POST(req: NextRequest) {
     const { student_name, grade, class_name, parent_name, parent_email } = row
 
     try {
-      // 1. Upsert student
-      const { data: student, error: studentError } = await admin
+      // 1. Find or create student (check by name first to avoid upsert constraint issues)
+      let studentId: string
+      const { data: existingStudent } = await admin
         .from('students')
-        .upsert(
-          { full_name: student_name.trim(), grade: grade.trim(), class_name: class_name.trim() },
-          { onConflict: 'full_name', ignoreDuplicates: false }
-        )
         .select('id')
+        .eq('full_name', student_name.trim())
         .single()
 
-      if (studentError) throw new Error(`Student error: ${studentError.message}`)
+      if (existingStudent) {
+        studentId = existingStudent.id
+      } else {
+        const { data: newStudent, error: studentError } = await admin
+          .from('students')
+          .insert({ full_name: student_name.trim(), grade: grade.trim(), class_name: class_name.trim() })
+          .select('id')
+          .single()
+        if (studentError) throw new Error(`Could not create student: ${studentError.message}`)
+        studentId = newStudent.id
+      }
 
-      // 2. Check if parent already exists
+      // 2. Find or create parent
+      const email = parent_email.trim().toLowerCase()
       const { data: existingProfile } = await admin
         .from('profiles')
         .select('id')
-        .eq('email', parent_email.trim().toLowerCase())
+        .eq('email', email)
         .single()
 
       let parentId: string
+      let isNew = false
 
       if (existingProfile) {
         parentId = existingProfile.id
       } else {
-        // Create parent account via admin API — sends invite email
         const { data: newUser, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
-          parent_email.trim().toLowerCase(),
-          {
-            data: {
-              full_name: parent_name.trim(),
-              role: 'parent',
-            },
-          }
+          email,
+          { data: { full_name: parent_name.trim(), role: 'parent' } }
         )
-
-        if (inviteError) throw new Error(`Invite error: ${inviteError.message}`)
+        if (inviteError) throw new Error(`Could not invite parent: ${inviteError.message}`)
         parentId = newUser.user.id
+        isNew = true
 
-        // Profile is auto-created by the DB trigger, but update name/role to be sure
-        await admin
-          .from('profiles')
-          .upsert({
-            id: parentId,
-            email: parent_email.trim().toLowerCase(),
-            full_name: parent_name.trim(),
-            role: 'parent',
-          })
+        // Ensure profile row has correct name/role (trigger may lag)
+        await admin.from('profiles').upsert({
+          id: parentId,
+          email,
+          full_name: parent_name.trim(),
+          role: 'parent',
+        })
       }
 
-      // 3. Link parent to student
+      // 3. Link parent → student
       await admin
         .from('parent_students')
         .upsert(
-          { parent_id: parentId, student_id: student.id },
+          { parent_id: parentId, student_id: studentId },
           { onConflict: 'parent_id,student_id', ignoreDuplicates: true }
         )
 
@@ -104,10 +113,10 @@ export async function POST(req: NextRequest) {
         row: i + 1,
         student_name,
         parent_email,
-        status: existingProfile ? 'existing' : 'created',
-        detail: existingProfile
-          ? 'Parent account already existed — linked to student.'
-          : 'Invite email sent to parent.',
+        status: isNew ? 'created' : 'existing',
+        detail: isNew
+          ? 'Invite email sent to parent.'
+          : 'Parent account already existed — linked to student.',
       })
     } catch (err: any) {
       results.push({
