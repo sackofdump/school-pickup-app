@@ -4,6 +4,33 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
+function ParentTag({ p, onUnlink }: { p: { id: string; full_name: string; email: string }; onUnlink: () => void }) {
+  const [showEmail, setShowEmail] = useState(false)
+  const displayName = p.full_name || p.email
+
+  return (
+    <span className="bg-blue-50 text-blue-700 text-xs rounded-full px-3 py-1 flex items-center gap-1">
+      <span>
+        {displayName}
+        {p.full_name && (
+          <button
+            onClick={() => setShowEmail(v => !v)}
+            className="text-blue-400 hover:text-blue-600 ml-1"
+          >
+            {showEmail ? `(${p.email})` : '(···)'}
+          </button>
+        )}
+      </span>
+      <button
+        onClick={onUnlink}
+        className="text-blue-400 hover:text-red-500 font-bold ml-1"
+      >
+        ×
+      </button>
+    </span>
+  )
+}
+
 interface Parent { id: string; full_name: string; email: string }
 interface Student {
   id: string
@@ -176,23 +203,11 @@ export default function StudentsManager({ students: initialStudents, parents }: 
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {linkedParents.map(p => (
-                        <span
+                        <ParentTag
                           key={p!.id}
-                          className="bg-blue-50 text-blue-700 text-xs rounded-full px-3 py-1 flex items-center gap-1"
-                        >
-                          <span>
-                            <span className="font-medium">{p!.full_name || p!.email}</span>
-                            {p!.full_name && (
-                              <span className="text-blue-400 ml-1">({p!.email})</span>
-                            )}
-                          </span>
-                          <button
-                            onClick={() => unlinkParent(student.id, p!.id)}
-                            className="text-blue-400 hover:text-red-500 font-bold ml-1"
-                          >
-                            ×
-                          </button>
-                        </span>
+                          p={p!}
+                          onUnlink={() => unlinkParent(student.id, p!.id)}
+                        />
                       ))}
                     </div>
                   )}
