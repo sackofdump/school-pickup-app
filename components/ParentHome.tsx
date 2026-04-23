@@ -12,7 +12,11 @@ interface Props {
 }
 
 export default function ParentHome({ profile, students, queueMap }: Props) {
-  const [statuses, setStatuses] = useState<Record<string, string>>(queueMap)
+  // TODO: remove this before going live — clears picked_up on load so testing isn't blocked
+  const clearedMap = Object.fromEntries(
+    Object.entries(queueMap).map(([k, v]) => [k, v === 'picked_up' ? '' : v])
+  )
+  const [statuses, setStatuses] = useState<Record<string, string>>(clearedMap)
   const [loading, setLoading] = useState<Record<string, boolean>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [justPickedUp, setJustPickedUp] = useState<Record<string, boolean>>({})
@@ -36,6 +40,11 @@ export default function ParentHome({ profile, students, queueMap }: Props) {
           setStatuses(prev => ({ ...prev, [student_id]: status }))
           if (status === 'picked_up') {
             setJustPickedUp(prev => ({ ...prev, [student_id]: true }))
+            // TODO: remove this timeout before going live
+            setTimeout(() => {
+              setStatuses(prev => ({ ...prev, [student_id]: '' }))
+              setJustPickedUp(prev => ({ ...prev, [student_id]: false }))
+            }, 30000)
           }
         }
       )
