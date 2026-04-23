@@ -138,6 +138,10 @@ create policy "Teachers update queue entries"
   on public.pickup_queue for update
   using (current_user_role() in ('teacher', 'admin'));
 
+create policy "Admins delete queue entries"
+  on public.pickup_queue for delete
+  using (current_user_role() = 'admin');
+
 -- school_settings: anyone authenticated can read; only admins write
 create policy "Authenticated users read settings"
   on public.school_settings for select
