@@ -28,7 +28,11 @@ interface Props {
 
 export default function TeacherDashboard({ initialQueue, teacherName, allStudents, initialStudentStatuses }: Props) {
   const [queue, setQueue] = useState<QueueEntry[]>(initialQueue)
-  const [studentStatuses, setStudentStatuses] = useState<Record<string, 'waiting' | 'picked_up'>>(initialStudentStatuses)
+  // TODO: remove the filter before going live — clears picked_up on load for testing
+  const clearedStatuses = Object.fromEntries(
+    Object.entries(initialStudentStatuses).filter(([, v]) => v !== 'picked_up')
+  ) as Record<string, 'waiting' | 'picked_up'>
+  const [studentStatuses, setStudentStatuses] = useState<Record<string, 'waiting' | 'picked_up'>>(clearedStatuses)
   const [marking, setMarking] = useState<Record<string, boolean>>({})
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarSearch, setSidebarSearch] = useState('')
@@ -73,12 +77,26 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
 
   async function markPickedUp(entryId: string) {
     setMarking(prev => ({ ...prev, [entryId]: true }))
+    const entry = queue.find(e => e.id === entryId)
     const res = await fetch(`/api/queue/${entryId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'picked_up' }),
     })
-    if (res.ok) setQueue(prev => prev.filter(e => e.id !== entryId))
+    if (res.ok) {
+      setQueue(prev => prev.filter(e => e.id !== entryId))
+      // TODO: remove this timeout before going live
+      if (entry?.students?.id) {
+        const studentId = entry.students.id
+        setTimeout(() => {
+          setStudentStatuses(prev => {
+            const next = { ...prev }
+            delete next[studentId]
+            return next
+          })
+        }, 30000)
+      }
+    }
     setMarking(prev => ({ ...prev, [entryId]: false }))
   }
 
