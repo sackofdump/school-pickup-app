@@ -23,7 +23,7 @@ export default function AbsencesManager({ students: initial, date, backHref }: P
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
-  const absentCount = students.filter(s => s.absent).length
+  const absentStudents = students.filter(s => s.absent)
 
   async function toggle(student: Student) {
     setLoading(prev => ({ ...prev, [student.id]: true }))
@@ -50,31 +50,28 @@ export default function AbsencesManager({ students: initial, date, backHref }: P
     }
   }
 
-  const filtered = students.filter(s =>
-    s.full_name.toLowerCase().includes(search.toLowerCase()) ||
-    s.grade?.toLowerCase().includes(search.toLowerCase()) ||
-    s.class_name?.toLowerCase().includes(search.toLowerCase())
-  )
-
-  const present = filtered.filter(s => !s.absent)
-  const absent = filtered.filter(s => s.absent)
+  const filtered = students
+    .filter(s =>
+      s.full_name.toLowerCase().includes(search.toLowerCase()) ||
+      s.grade?.toLowerCase().includes(search.toLowerCase()) ||
+      s.class_name?.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => Number(a.absent) - Number(b.absent))
 
   return (
     <main className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-2xl mx-auto">
+
+        {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <Link href={backHref} className="text-gray-400 hover:text-gray-600">←</Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Absent Today</h1>
             <p className="text-gray-500 text-sm">{new Date(date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
           </div>
-          {absentCount > 0 && (
-            <span className="ml-auto bg-orange-100 text-orange-700 font-semibold text-sm px-3 py-1 rounded-full">
-              🤒 {absentCount} absent
-            </span>
-          )}
         </div>
 
+        {/* Error banner */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 text-sm text-red-600 flex items-center justify-between">
             <span>⚠️ {error}</span>
@@ -82,77 +79,94 @@ export default function AbsencesManager({ students: initial, date, backHref }: P
           </div>
         )}
 
+        {/* Absent today panel */}
+        <div className="bg-white rounded-xl border border-orange-200 shadow-sm mb-6 overflow-hidden">
+          <div className="bg-orange-50 px-4 py-3 border-b border-orange-100 flex items-center justify-between">
+            <p className="font-semibold text-orange-800">Absent Today</p>
+            <span className="text-sm font-bold text-orange-700">
+              {absentStudents.length === 0 ? 'None' : `${absentStudents.length} student${absentStudents.length === 1 ? '' : 's'}`}
+            </span>
+          </div>
+          {absentStudents.length === 0 ? (
+            <p className="px-4 py-5 text-sm text-gray-400 text-center">No one marked absent yet.</p>
+          ) : (
+            <div className="divide-y divide-orange-50">
+              {absentStudents.map(s => (
+                <div key={s.id} className="flex items-center justify-between px-4 py-3">
+                  <div>
+                    <p className="font-medium text-orange-800">{s.full_name}</p>
+                    <p className="text-xs text-orange-500">
+                      {s.grade && `Grade ${s.grade}`}
+                      {s.grade && s.class_name && ' · '}
+                      {s.class_name}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => toggle(s)}
+                    disabled={loading[s.id]}
+                    className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-2.5 py-1.5 transition-colors disabled:opacity-40"
+                  >
+                    {loading[s.id] ? '…' : 'Remove'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Search */}
         <div className="relative mb-4">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search students…"
-            className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
         </div>
 
-        {/* Present students */}
-        <div className="space-y-2 mb-6">
-          {present.map(student => (
-            <div key={student.id} className="bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100 flex items-center justify-between">
+        {/* All students */}
+        <div className="space-y-2">
+          {filtered.map(student => (
+            <div
+              key={student.id}
+              className={`rounded-xl px-4 py-3 border flex items-center justify-between ${
+                student.absent
+                  ? 'bg-orange-50 border-orange-200'
+                  : 'bg-white border-gray-100 shadow-sm'
+              }`}
+            >
               <div>
-                <p className="font-medium text-gray-900">{student.full_name}</p>
-                <p className="text-xs text-gray-500">
+                <p className={`font-medium ${student.absent ? 'text-orange-800' : 'text-gray-900'}`}>
+                  {student.full_name}
+                </p>
+                <p className={`text-xs ${student.absent ? 'text-orange-400' : 'text-gray-500'}`}>
                   {student.grade && `Grade ${student.grade}`}
                   {student.grade && student.class_name && ' · '}
                   {student.class_name}
+                  {student.absent && ' · Absent'}
                 </p>
               </div>
               <button
                 onClick={() => toggle(student)}
                 disabled={loading[student.id]}
-                className="text-sm text-orange-500 hover:bg-orange-50 border border-orange-200 rounded-lg px-3 py-1.5 transition-colors"
+                className={`text-sm rounded-lg px-3 py-1.5 border transition-colors disabled:opacity-40 ${
+                  student.absent
+                    ? 'text-gray-500 border-gray-200 hover:bg-white'
+                    : 'text-orange-500 border-orange-200 hover:bg-orange-50'
+                }`}
               >
-                {loading[student.id] ? '…' : 'Mark Absent'}
+                {loading[student.id] ? '…' : student.absent ? 'Mark Present' : 'Mark Absent'}
               </button>
             </div>
           ))}
-        </div>
 
-        {/* Absent students */}
-        {absent.length > 0 && (
-          <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Absent</p>
-            <div className="space-y-2">
-              {absent.map(student => (
-                <div key={student.id} className="bg-orange-50 rounded-xl px-4 py-3 border border-orange-200 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🤒</span>
-                    <div>
-                      <p className="font-medium text-orange-800">{student.full_name}</p>
-                      <p className="text-xs text-orange-500">
-                        {student.grade && `Grade ${student.grade}`}
-                        {student.grade && student.class_name && ' · '}
-                        {student.class_name}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => toggle(student)}
-                    disabled={loading[student.id]}
-                    className="text-sm text-gray-500 hover:bg-white border border-gray-200 rounded-lg px-3 py-1.5 transition-colors"
-                  >
-                    {loading[student.id] ? '…' : 'Undo'}
-                  </button>
-                </div>
-              ))}
+          {filtered.length === 0 && (
+            <div className="text-center py-12 text-gray-400">
+              <p>No students match "{search}"</p>
             </div>
-          </div>
-        )}
-
-        {filtered.length === 0 && (
-          <div className="text-center py-12 text-gray-400">
-            <p className="text-3xl mb-2">🔍</p>
-            <p>No students match "{search}"</p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </main>
   )
