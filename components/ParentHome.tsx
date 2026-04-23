@@ -9,14 +9,16 @@ interface Props {
   profile: Profile
   students: Student[]
   queueMap: Record<string, string>
+  initialAbsentIds: string[]
 }
 
 function getSuccessMessage() {
   return new Date().getDay() === 5 ? 'Success! See you Monday!' : 'Success! See you tomorrow!'
 }
 
-export default function ParentHome({ profile, students, queueMap }: Props) {
+export default function ParentHome({ profile, students, queueMap, initialAbsentIds }: Props) {
   const [statuses, setStatuses] = useState<Record<string, string>>(queueMap)
+  const [absentIds] = useState<Set<string>>(new Set(initialAbsentIds))
   const [loading, setLoading] = useState<Record<string, boolean>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [justPickedUp, setJustPickedUp] = useState<Record<string, boolean>>({})
@@ -143,6 +145,7 @@ export default function ParentHome({ profile, students, queueMap }: Props) {
               const isLoading = loading[student.id]
               const error = errors[student.id]
               const isNew = justPickedUp[student.id]
+              const isAbsent = absentIds.has(student.id) && !status
 
               return (
                 <div key={student.id} className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
@@ -180,6 +183,32 @@ export default function ParentHome({ profile, students, queueMap }: Props) {
                       <p className={`font-bold text-sm ${isNew ? 'text-white' : 'text-green-700 dark:text-green-400'}`}>
                         {isNew ? getSuccessMessage() : `${student.full_name} has been picked up today.`}
                       </p>
+                    </div>
+                  ) : isAbsent ? (
+                    <div className="rounded-xl border border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 px-4 py-4">
+                      <p className="font-semibold text-orange-800 dark:text-orange-300 text-sm mb-0.5">
+                        {student.full_name} was marked absent today
+                      </p>
+                      <p className="text-orange-600 dark:text-orange-400 text-xs mb-3">
+                        Here by mistake? You can still check in.
+                      </p>
+                      <button
+                        onClick={() => handleCheckIn(student)}
+                        disabled={isLoading}
+                        className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-semibold rounded-lg py-2.5 text-sm transition-colors"
+                      >
+                        {isLoading ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                            </svg>
+                            Checking location…
+                          </span>
+                        ) : (
+                          'Check in anyway'
+                        )}
+                      </button>
                     </div>
                   ) : (
                     <button

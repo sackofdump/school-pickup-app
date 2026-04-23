@@ -36,11 +36,20 @@ export default async function ParentPage() {
     queueMap[entry.student_id] = entry.status
   }
 
+  // Fetch today's absences for linked students
+  const studentIds = students.map((s: any) => s.id)
+  const { data: absenceEntries } = studentIds.length
+    ? await supabase.from('absences').select('student_id').eq('date', today).in('student_id', studentIds)
+    : { data: [] }
+
+  const absentIds = (absenceEntries ?? []).map((a: any) => a.student_id)
+
   return (
     <ParentHome
       profile={profile}
       students={students}
       queueMap={queueMap}
+      initialAbsentIds={absentIds}
     />
   )
 }
