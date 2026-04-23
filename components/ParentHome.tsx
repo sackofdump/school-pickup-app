@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { getCurrentPosition } from '@/lib/location'
+import { createClient } from '@/lib/supabase/client'
 import type { Student, Profile } from '@/types'
 
 interface Props {
@@ -14,6 +15,34 @@ export default function ParentHome({ profile, students, queueMap }: Props) {
   const [statuses, setStatuses] = useState<Record<string, string>>(queueMap)
   const [loading, setLoading] = useState<Record<string, boolean>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [justPickedUp, setJustPickedUp] = useState<Record<string, boolean>>({})
+
+  // Real-time: listen for pickup_queue changes for this parent
+  useEffect(() => {
+    const supabase = createClient()
+
+    const channel = supabase
+      .channel('parent_queue')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'pickup_queue',
+          filter: `parent_id=eq.${profile.id}`,
+        },
+        (payload) => {
+          const { student_id, status } = payload.new as { student_id: string; status: string }
+          setStatuses(prev => ({ ...prev, [student_id]: status }))
+          if (status === 'picked_up') {
+            setJustPickedUp(prev => ({ ...prev, [student_id]: true }))
+          }
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [profile.id])
 
   async function handleCheckIn(student: Student) {
     setLoading(prev => ({ ...prev, [student.id]: true }))
@@ -54,7 +83,6 @@ export default function ParentHome({ profile, students, queueMap }: Props) {
 
   return (
     <main className="min-h-screen bg-blue-50">
-      {/* Header */}
       <header className="bg-white border-b border-gray-100 px-4 py-4 flex items-center justify-between">
         <div>
           <h1 className="font-bold text-gray-900 text-lg">School Pickup</h1>
@@ -80,6 +108,7 @@ export default function ParentHome({ profile, students, queueMap }: Props) {
               const status = statuses[student.id]
               const isLoading = loading[student.id]
               const error = errors[student.id]
+              const isNew = justPickedUp[student.id]
 
               return (
                 <div key={student.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
@@ -112,9 +141,18 @@ export default function ParentHome({ profile, students, queueMap }: Props) {
                       </div>
                     </div>
                   ) : status === 'picked_up' ? (
-                    <div className="flex items-center gap-2 bg-green-50 rounded-xl px-4 py-3">
-                      <span className="text-green-500 text-lg">✅</span>
-                      <p className="font-semibold text-green-700 text-sm">{student.full_name} has been picked up today.</p>
+                    <div className={`rounded-xl px-4 py-4 text-center ${isNew ? 'bg-green-500' : 'bg-green-50'}`}>
+                      <p className="text-3xl mb-1">{isNew ? '🎉' : '✅'}</p>
+                      <p className={`font-bold text-sm ${isNew ? 'text-white' : 'text-green-700'}`}>
+                        {isNew
+                          ? `Come on through! ${student.full_name} is on the way out.`
+                          : `${student.full_name} has been picked up today.`}
+                      </p>
+                      {isNew && (
+                        <p className="text-green-100 text-xs mt-1">
+                          A teacher confirmed your pickup.
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <button
