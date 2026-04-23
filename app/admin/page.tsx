@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import ResetQueueButton from '@/components/ResetQueueButton'
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -98,6 +99,8 @@ export default async function AdminPage() {
             </div>
             <span className="text-gray-400">›</span>
           </Link>
+
+          <ResetQueueButton />
         </div>
       </div>
     </main>
