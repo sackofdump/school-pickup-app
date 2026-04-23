@@ -45,23 +45,23 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // TODO: re-enable once testing is done
   // Check if already checked in today
-  const today = new Date().toISOString().split('T')[0]
-  const { data: existing } = await supabase
-    .from('pickup_queue')
-    .select('id, status')
-    .eq('parent_id', user.id)
-    .eq('student_id', student_id)
-    .gte('arrived_at', `${today}T00:00:00`)
-    .single()
-
-  if (existing) {
-    return NextResponse.json({
-      error: existing.status === 'waiting'
-        ? 'You are already in the queue.'
-        : 'This child has already been picked up today.',
-    }, { status: 409 })
-  }
+  // const today = new Date().toISOString().split('T')[0]
+  // const { data: existing } = await supabase
+  //   .from('pickup_queue')
+  //   .select('id, status')
+  //   .eq('parent_id', user.id)
+  //   .eq('student_id', student_id)
+  //   .gte('arrived_at', `${today}T00:00:00`)
+  //   .single()
+  // if (existing) {
+  //   return NextResponse.json({
+  //     error: existing.status === 'waiting'
+  //       ? 'You are already in the queue.'
+  //       : 'This child has already been picked up today.',
+  //   }, { status: 409 })
+  // }
 
   const { data: entry, error } = await supabase
     .from('pickup_queue')
