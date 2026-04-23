@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { getCurrentPosition } from '@/lib/location'
 import { createClient } from '@/lib/supabase/client'
 import type { Student, Profile } from '@/types'
@@ -21,20 +21,44 @@ export default function ParentHome({ profile, students, queueMap }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [justPickedUp, setJustPickedUp] = useState<Record<string, boolean>>({})
 
-  // Real-time: listen for pickup_queue changes for this parent
-  useEffect(() => {
-    const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
+  const fetchStatuses = useCallback(async () => {
+    const today = new Date().toISOString().split('T')[0]
+    const { data } = await supabase
+      .from('pickup_queue')
+      .select('student_id, status')
+      .eq('parent_id', profile.id)
+      .gte('arrived_at', `${today}T00:00:00`)
+
+    if (!data) return
+
+    setStatuses(prev => {
+      const next = { ...prev }
+      const newPickups: string[] = []
+      for (const entry of data) {
+        if (entry.status === 'picked_up' && prev[entry.student_id] !== 'picked_up') {
+          newPickups.push(entry.student_id)
+        }
+        next[entry.student_id] = entry.status
+      }
+      if (newPickups.length > 0) {
+        setJustPickedUp(p => {
+          const updated = { ...p }
+          for (const id of newPickups) updated[id] = true
+          return updated
+        })
+      }
+      return next
+    })
+  }, [supabase, profile.id])
+
+  useEffect(() => {
     const channel = supabase
       .channel('parent_queue')
       .on(
         'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'pickup_queue',
-          filter: `parent_id=eq.${profile.id}`,
-        },
+        { event: 'UPDATE', schema: 'public', table: 'pickup_queue', filter: `parent_id=eq.${profile.id}` },
         (payload) => {
           const { student_id, status } = payload.new as { student_id: string; status: string }
           setStatuses(prev => ({ ...prev, [student_id]: status }))
@@ -45,8 +69,14 @@ export default function ParentHome({ profile, students, queueMap }: Props) {
       )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
-  }, [profile.id])
+    // Polling fallback every 5s so the success message always appears even if real-time drops
+    const poll = setInterval(fetchStatuses, 5000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(poll)
+    }
+  }, [supabase, profile.id, fetchStatuses])
 
   async function handleCheckIn(student: Student) {
     setLoading(prev => ({ ...prev, [student.id]: true }))
