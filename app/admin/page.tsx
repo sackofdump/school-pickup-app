@@ -59,6 +59,20 @@ export default async function AdminPage() {
           </Link>
 
           <Link
+            href="/admin/parents"
+            className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex items-center justify-between hover:border-green-300 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">👨‍👩‍👧</span>
+              <div>
+                <p className="font-semibold text-gray-800">Manage Parents</p>
+                <p className="text-gray-500 text-sm">Add parents and link them to students</p>
+              </div>
+            </div>
+            <span className="text-gray-400">›</span>
+          </Link>
+
+          <Link
             href="/admin/absences"
             className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex items-center justify-between hover:border-orange-300 transition-colors"
           >
