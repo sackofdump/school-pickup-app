@@ -18,11 +18,14 @@ export default function ParentsPage({ initialParents }: { initialParents: Parent
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState('')
   const [lastTempPassword, setLastTempPassword] = useState('')
+  const [lastEmailSent, setLastEmailSent] = useState(false)
+  const [deleting, setDeleting] = useState<Record<string, boolean>>({})
 
   async function addParent(e: React.FormEvent) {
     e.preventDefault()
     setAdding(true)
     setError('')
+    setLastTempPassword('')
 
     const res = await fetch('/api/parents', {
       method: 'POST',
@@ -42,32 +45,52 @@ export default function ParentsPage({ initialParents }: { initialParents: Parent
         parent_students: [],
       }])
       setLastTempPassword(data.temp_password ?? '')
+      setLastEmailSent(!!data.email_sent)
       setName('')
       setEmail('')
     }
     setAdding(false)
   }
 
+  async function deleteParent(id: string, displayName: string) {
+    if (!confirm(`Delete ${displayName || 'this parent'}? This cannot be undone.`)) return
+    setDeleting(prev => ({ ...prev, [id]: true }))
+
+    const res = await fetch('/api/parents', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+
+    if (res.ok) {
+      setParents(prev => prev.filter(p => p.id !== id))
+    } else {
+      const data = await res.json().catch(() => ({}))
+      alert(data.error ?? 'Delete failed')
+    }
+    setDeleting(prev => ({ ...prev, [id]: false }))
+  }
+
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
+    <main className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-3 mb-8">
-          <Link href="/admin" className="text-gray-400 hover:text-gray-600">← Admin</Link>
-          <h1 className="text-2xl font-bold text-gray-900">Parents</h1>
-          <span className="bg-green-100 text-green-700 text-sm font-medium px-2.5 py-0.5 rounded-full">
+          <Link href="/admin" className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">← Admin</Link>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Parents</h1>
+          <span className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 text-sm font-medium px-2.5 py-0.5 rounded-full">
             {parents.length}
           </span>
         </div>
 
         {/* Add parent form */}
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 mb-6">
-          <h2 className="font-semibold text-gray-700 mb-3">Add Parent Account</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
+          <h2 className="font-semibold text-gray-700 dark:text-gray-200 mb-3">Add Parent Account</h2>
           <form onSubmit={addParent} className="flex flex-wrap gap-2 items-start">
             <input
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Full name"
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white flex-1 min-w-36 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 placeholder-gray-400 dark:placeholder-gray-500 flex-1 min-w-36 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
             <input
               type="email"
@@ -75,7 +98,7 @@ export default function ParentsPage({ initialParents }: { initialParents: Parent
               onChange={e => setEmail(e.target.value)}
               placeholder="Email *"
               required
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white flex-1 min-w-48 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 placeholder-gray-400 dark:placeholder-gray-500 flex-1 min-w-48 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
             <button
               type="submit"
@@ -87,9 +110,11 @@ export default function ParentsPage({ initialParents }: { initialParents: Parent
           </form>
           {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
           {lastTempPassword && (
-            <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mt-2">
+            <p className="text-xs text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/40 border border-green-200 dark:border-green-700 rounded-lg px-3 py-2 mt-2">
               Account created! Temporary password: <code className="font-bold">{lastTempPassword}</code>
-              <span className="text-green-500 ml-1">— share this with the parent</span>
+              {lastEmailSent
+                ? <span className="text-green-500 dark:text-green-400 ml-1">— welcome email sent</span>
+                : <span className="text-green-500 dark:text-green-400 ml-1">— share this with the parent</span>}
             </p>
           )}
         </div>
@@ -102,20 +127,29 @@ export default function ParentsPage({ initialParents }: { initialParents: Parent
               .filter(Boolean)
 
             return (
-              <div key={parent.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <div key={parent.id} className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="font-semibold text-gray-900">{parent.full_name || '—'}</p>
-                    <p className="text-sm text-gray-500">{parent.email}</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{parent.full_name || '—'}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{parent.email}</p>
                   </div>
-                  <span className="text-xs text-gray-400">
-                    {new Date(parent.created_at).toLocaleDateString()}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                      {new Date(parent.created_at).toLocaleDateString()}
+                    </span>
+                    <button
+                      onClick={() => deleteParent(parent.id, parent.full_name || parent.email)}
+                      disabled={deleting[parent.id]}
+                      className="text-xs text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-400 disabled:opacity-40 transition-colors"
+                    >
+                      {deleting[parent.id] ? '…' : 'Delete'}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-2 items-center">
                   {children.map((c: any, i: number) => (
-                    <span key={i} className="bg-blue-50 text-blue-700 text-xs rounded-full px-3 py-1">
+                    <span key={i} className="bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs rounded-full px-3 py-1">
                       {c.full_name}
                       {c.grade && ` · Grade ${c.grade}`}
                       {c.class_name && ` · ${c.class_name}`}
@@ -123,7 +157,7 @@ export default function ParentsPage({ initialParents }: { initialParents: Parent
                   ))}
                   <Link
                     href={`/admin/parents/${parent.id}/link`}
-                    className="text-xs text-blue-500 hover:text-blue-700 hover:underline italic"
+                    className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline italic"
                   >
                     {children.length === 0 ? 'No children linked — click to add' : '+ add more'}
                   </Link>
@@ -133,7 +167,7 @@ export default function ParentsPage({ initialParents }: { initialParents: Parent
           })}
 
           {parents.length === 0 && (
-            <div className="text-center py-16 text-gray-400">
+            <div className="text-center py-16 text-gray-400 dark:text-gray-500">
               <p className="text-3xl mb-2">👨‍👩‍👧</p>
               <p>No parent accounts yet.</p>
               <Link href="/admin/import" className="text-blue-500 text-sm mt-1 inline-block hover:underline">

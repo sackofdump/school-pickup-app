@@ -116,22 +116,22 @@ export default function ParentHome({ profile, students, queueMap }: Props) {
   }
 
   return (
-    <main className="min-h-screen bg-blue-50">
-      <header className="bg-white border-b border-gray-100 px-4 py-4 flex items-center justify-between">
+    <main className="min-h-screen bg-blue-50 dark:bg-gray-900">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-4 py-4 flex items-center justify-between">
         <div>
-          <h1 className="font-bold text-gray-900 text-lg">School Pickup</h1>
-          <p className="text-gray-500 text-sm">Hi, {profile.full_name}</p>
+          <h1 className="font-bold text-gray-900 dark:text-white text-lg">School Pickup</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Hi, {profile.full_name}</p>
         </div>
         <form action="/api/auth/logout" method="POST">
-          <button className="text-sm text-gray-400 hover:text-gray-600">Sign out</button>
+          <button className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">Sign out</button>
         </form>
       </header>
 
       <div className="max-w-lg mx-auto p-4 pt-6">
-        <h2 className="text-base font-semibold text-gray-700 mb-3">Your children</h2>
+        <h2 className="text-base font-semibold text-gray-700 dark:text-gray-300 mb-3">Your children</h2>
 
         {students.length === 0 ? (
-          <div className="bg-white rounded-2xl p-8 text-center text-gray-400 shadow-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 text-center text-gray-400 dark:text-gray-500 shadow-sm">
             <p className="text-4xl mb-3">👦</p>
             <p>No children linked to your account yet.</p>
             <p className="text-sm mt-1">Contact the school admin to get set up.</p>
@@ -145,14 +145,14 @@ export default function ParentHome({ profile, students, queueMap }: Props) {
               const isNew = justPickedUp[student.id]
 
               return (
-                <div key={student.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <div key={student.id} className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-xl font-bold text-blue-600">
+                    <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-xl font-bold text-blue-600 dark:text-blue-300">
                       {student.full_name.charAt(0)}
                     </div>
                     <div>
-                      <p className="font-semibold text-gray-900">{student.full_name}</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="font-semibold text-gray-900 dark:text-white">{student.full_name}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
                         {student.grade && `Grade ${student.grade}`}
                         {student.grade && student.class_name && ' · '}
                         {student.class_name}
@@ -161,23 +161,23 @@ export default function ParentHome({ profile, students, queueMap }: Props) {
                   </div>
 
                   {error && (
-                    <p className="text-red-500 text-sm bg-red-50 rounded-lg px-3 py-2 mb-3">
+                    <p className="text-red-500 text-sm bg-red-50 dark:bg-red-900/30 rounded-lg px-3 py-2 mb-3">
                       {error}
                     </p>
                   )}
 
                   {status === 'waiting' ? (
-                    <div className="flex items-center gap-2 bg-amber-50 rounded-xl px-4 py-3">
+                    <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/30 rounded-xl px-4 py-3">
                       <span className="text-amber-500 text-lg">⏳</span>
                       <div>
-                        <p className="font-semibold text-amber-700 text-sm">You're in the queue!</p>
-                        <p className="text-amber-600 text-xs">A teacher will bring {student.full_name} out shortly.</p>
+                        <p className="font-semibold text-amber-700 dark:text-amber-400 text-sm">You're in the queue!</p>
+                        <p className="text-amber-600 dark:text-amber-500 text-xs">A teacher will bring {student.full_name} out shortly.</p>
                       </div>
                     </div>
                   ) : status === 'picked_up' ? (
-                    <div className={`rounded-xl px-4 py-4 text-center ${isNew ? 'bg-green-500' : 'bg-green-50'}`}>
+                    <div className={`rounded-xl px-4 py-4 text-center ${isNew ? 'bg-green-500' : 'bg-green-50 dark:bg-green-900/30'}`}>
                       <p className="text-3xl mb-1">{isNew ? '🎉' : '✅'}</p>
-                      <p className={`font-bold text-sm ${isNew ? 'text-white' : 'text-green-700'}`}>
+                      <p className={`font-bold text-sm ${isNew ? 'text-white' : 'text-green-700 dark:text-green-400'}`}>
                         {isNew ? getSuccessMessage() : `${student.full_name} has been picked up today.`}
                       </p>
                     </div>
@@ -206,7 +206,7 @@ export default function ParentHome({ profile, students, queueMap }: Props) {
           </div>
         )}
 
-        <p className="text-center text-xs text-gray-400 mt-6">
+        <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-6">
           Your location is only used to confirm you're at school.
         </p>
       </div>

@@ -97,23 +97,23 @@ export default function ImportPage() {
   const errorCount = results?.filter(r => r.status === 'error').length ?? 0
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
+    <main className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-3 mb-8">
-          <Link href="/admin" className="text-gray-400 hover:text-gray-600">← Admin</Link>
-          <h1 className="text-2xl font-bold text-gray-900">Bulk Import</h1>
+          <Link href="/admin" className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">← Admin</Link>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Bulk Import</h1>
         </div>
 
         {/* Instructions */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6">
-          <p className="font-semibold text-blue-800 mb-2">CSV format</p>
-          <p className="text-blue-700 text-sm mb-3">
+        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-xl p-5 mb-6">
+          <p className="font-semibold text-blue-800 dark:text-blue-300 mb-2">CSV format</p>
+          <p className="text-blue-700 dark:text-blue-400 text-sm mb-3">
             Your spreadsheet must have these column headers (exact names, case-insensitive):
           </p>
-          <code className="block bg-white border border-blue-200 rounded-lg px-4 py-3 text-sm text-gray-800 font-mono">
+          <code className="block bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-700 rounded-lg px-4 py-3 text-sm text-gray-800 dark:text-gray-200 font-mono">
             student_name, grade, class_name, parent_name, parent_email
           </code>
-          <p className="text-blue-600 text-xs mt-3">
+          <p className="text-blue-600 dark:text-blue-400 text-xs mt-3">
             Multiple rows with the same student but different parents are supported.
             Existing accounts won't be duplicated. New accounts get a unique temporary password and are sent a welcome email automatically.
           </p>
@@ -124,15 +124,15 @@ export default function ImportPage() {
           <a
             href="data:text/csv;charset=utf-8,student_name,grade,class_name,parent_name,parent_email%0AEmma Johnson,4,4B,Sarah Johnson,sarah%40example.com%0ALiam Smith,2,2A,Mike Smith,mike%40example.com"
             download="import-template.csv"
-            className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg px-4 py-2 bg-white hover:bg-blue-50 transition-colors"
+            className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-lg px-4 py-2 bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
           >
             ⬇ Download template CSV
           </a>
         </div>
 
         {/* File upload */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
             Upload CSV file
           </label>
           <input
@@ -140,15 +140,15 @@ export default function ImportPage() {
             type="file"
             accept=".csv"
             onChange={handleFile}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:font-medium hover:file:bg-blue-100 cursor-pointer"
+            className="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 dark:file:bg-blue-900/40 file:text-blue-700 dark:file:text-blue-300 file:font-medium hover:file:bg-blue-100 dark:hover:file:bg-blue-900/60 cursor-pointer"
           />
         </div>
 
         {/* Missing headers error */}
         {missingHeaders.length > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
-            <p className="font-semibold text-red-700">Missing required columns:</p>
-            <ul className="mt-1 text-red-600 text-sm list-disc list-inside">
+          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-xl p-4 mb-6">
+            <p className="font-semibold text-red-700 dark:text-red-400">Missing required columns:</p>
+            <ul className="mt-1 text-red-600 dark:text-red-400 text-sm list-disc list-inside">
               {missingHeaders.map(h => <li key={h}><code>{h}</code></li>)}
             </ul>
           </div>
@@ -156,12 +156,12 @@ export default function ImportPage() {
 
         {/* Preview table */}
         {preview && preview.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
               <div>
-                <p className="font-semibold text-gray-800">Preview — {preview.length} rows</p>
-                <p className="text-sm text-gray-500">
-                  <span className="text-green-600">{validCount} valid</span>
+                <p className="font-semibold text-gray-800 dark:text-gray-100">Preview — {preview.length} rows</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <span className="text-green-600 dark:text-green-400">{validCount} valid</span>
                   {invalidCount > 0 && <span className="text-red-500 ml-2">{invalidCount} with errors (will be skipped)</span>}
                 </p>
               </div>
@@ -176,7 +176,7 @@ export default function ImportPage() {
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase">
                   <tr>
                     <th className="px-4 py-3 text-left">#</th>
                     <th className="px-4 py-3 text-left">Student</th>
@@ -187,18 +187,18 @@ export default function ImportPage() {
                     <th className="px-4 py-3 text-left">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {preview.map((row, i) => (
-                    <tr key={i} className={row._valid ? '' : 'bg-red-50'}>
-                      <td className="px-4 py-3 text-gray-400">{i + 1}</td>
-                      <td className="px-4 py-3 font-medium text-gray-900">{row.student_name}</td>
-                      <td className="px-4 py-3 text-gray-600">{row.grade}</td>
-                      <td className="px-4 py-3 text-gray-600">{row.class_name}</td>
-                      <td className="px-4 py-3 text-gray-600">{row.parent_name}</td>
-                      <td className="px-4 py-3 text-gray-600">{row.parent_email}</td>
+                    <tr key={i} className={row._valid ? '' : 'bg-red-50 dark:bg-red-900/20'}>
+                      <td className="px-4 py-3 text-gray-400 dark:text-gray-500">{i + 1}</td>
+                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{row.student_name}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.grade}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.class_name}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.parent_name}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.parent_email}</td>
                       <td className="px-4 py-3">
                         {row._valid ? (
-                          <span className="text-green-600 text-xs">✓ Ready</span>
+                          <span className="text-green-600 dark:text-green-400 text-xs">✓ Ready</span>
                         ) : (
                           <span className="text-red-500 text-xs">{row._errors.join(', ')}</span>
                         )}
@@ -213,19 +213,19 @@ export default function ImportPage() {
 
         {/* Results */}
         {results && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <p className="font-semibold text-gray-800">Import complete</p>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+              <p className="font-semibold text-gray-800 dark:text-gray-100">Import complete</p>
               <div className="flex gap-4 mt-1 text-sm">
-                {createdCount > 0 && <span className="text-green-600">✓ {createdCount} created</span>}
-                {existingCount > 0 && <span className="text-blue-600">↩ {existingCount} already existed</span>}
+                {createdCount > 0 && <span className="text-green-600 dark:text-green-400">✓ {createdCount} created</span>}
+                {existingCount > 0 && <span className="text-blue-600 dark:text-blue-400">↩ {existingCount} already existed</span>}
                 {errorCount > 0 && <span className="text-red-500">✗ {errorCount} errors</span>}
               </div>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase">
                   <tr>
                     <th className="px-4 py-3 text-left">#</th>
                     <th className="px-4 py-3 text-left">Student</th>
@@ -234,21 +234,21 @@ export default function ImportPage() {
                     <th className="px-4 py-3 text-left">Result</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {results.map((r, i) => (
-                    <tr key={i} className={r.status === 'error' ? 'bg-red-50' : ''}>
-                      <td className="px-4 py-3 text-gray-400">{r.row}</td>
-                      <td className="px-4 py-3 font-medium text-gray-900">{r.student_name}</td>
-                      <td className="px-4 py-3 text-gray-600">{r.parent_email}</td>
+                    <tr key={i} className={r.status === 'error' ? 'bg-red-50 dark:bg-red-900/20' : ''}>
+                      <td className="px-4 py-3 text-gray-400 dark:text-gray-500">{r.row}</td>
+                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{r.student_name}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{r.parent_email}</td>
                       <td className="px-4 py-3">
                         {r.temp_password
-                          ? <code className="bg-amber-50 text-amber-800 border border-amber-200 rounded px-1.5 py-0.5 text-xs font-bold">{r.temp_password}</code>
-                          : <span className="text-gray-300 text-xs">—</span>
+                          ? <code className="bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-700 rounded px-1.5 py-0.5 text-xs font-bold">{r.temp_password}</code>
+                          : <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
                         }
                       </td>
                       <td className="px-4 py-3">
-                        {r.status === 'created' && <span className="text-green-600 text-xs">✓ {r.detail}</span>}
-                        {r.status === 'existing' && <span className="text-blue-600 text-xs">↩ {r.detail}</span>}
+                        {r.status === 'created' && <span className="text-green-600 dark:text-green-400 text-xs">✓ {r.detail}</span>}
+                        {r.status === 'existing' && <span className="text-blue-600 dark:text-blue-400 text-xs">↩ {r.detail}</span>}
                         {r.status === 'error' && <span className="text-red-500 text-xs">✗ {r.detail}</span>}
                       </td>
                     </tr>
