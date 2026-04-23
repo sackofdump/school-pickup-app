@@ -51,9 +51,13 @@ export async function POST(req: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
   let emailSent = false
 
-  if (resend) {
+  let emailError: string | undefined
+
+  if (!process.env.RESEND_API_KEY) {
+    emailError = 'RESEND_API_KEY not set in environment'
+  } else if (resend) {
     try {
-      await resend.emails.send({
+      const result = await resend.emails.send({
         from: emailFrom,
         to: cleanEmail,
         subject: 'Your School Pickup account is ready',
@@ -73,13 +77,19 @@ export async function POST(req: NextRequest) {
           </div>
         `,
       })
-      emailSent = true
-    } catch {
-      // Non-fatal — account still created
+      if (result.error) {
+        emailError = result.error.message
+      } else {
+        emailSent = true
+      }
+    } catch (err: any) {
+      emailError = err?.message ?? 'Unknown email error'
     }
   }
 
-  return NextResponse.json({ id: newUser.user.id, email: cleanEmail, full_name: cleanName, temp_password: tempPassword, email_sent: emailSent }, { status: 201 })
+  console.log('[parents] email result:', { emailSent, emailError, to: cleanEmail, from: emailFrom })
+
+  return NextResponse.json({ id: newUser.user.id, email: cleanEmail, full_name: cleanName, temp_password: tempPassword, email_sent: emailSent, email_error: emailError ?? null }, { status: 201 })
 }
 
 export async function DELETE(req: NextRequest) {

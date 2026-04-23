@@ -46,6 +46,7 @@ export default function ParentsPage({ initialParents }: { initialParents: Parent
       }])
       setLastTempPassword(data.temp_password ?? '')
       setLastEmailSent(!!data.email_sent)
+      if (data.email_error) setError(`Account created but email failed: ${data.email_error}`)
       setName('')
       setEmail('')
     }
