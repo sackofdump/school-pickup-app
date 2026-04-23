@@ -221,7 +221,7 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
     if (queueSort === 'grade') {
       return [...queue].sort((a, b) => {
         const gDiff = gradeOrder(a.students?.grade ?? '') - gradeOrder(b.students?.grade ?? '')
-        return gDiff !== 0 ? gDiff : a.full_name?.localeCompare(b.full_name ?? '') ?? 0
+        return gDiff !== 0 ? gDiff : (a.students?.full_name ?? '').localeCompare(b.students?.full_name ?? '')
       })
     }
     return queue // already sorted by arrived_at from the query
