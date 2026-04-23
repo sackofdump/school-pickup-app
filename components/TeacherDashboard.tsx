@@ -61,8 +61,18 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
     if (queueData) setQueue(queueData as unknown as QueueEntry[])
     if (entries) {
       const map: Record<string, 'waiting' | 'picked_up'> = {}
-      for (const e of entries) map[e.student_id] = e.status
-      setStudentStatuses(map)
+      // TODO: remove the picked_up filter before going live
+      for (const e of entries) {
+        if (e.status !== 'picked_up') map[e.student_id] = e.status
+      }
+      setStudentStatuses(prev => {
+        // Preserve any picked_up entries that still have a 30s timer running
+        const preserved: Record<string, 'waiting' | 'picked_up'> = {}
+        for (const [k, v] of Object.entries(prev)) {
+          if (v === 'picked_up') preserved[k] = v
+        }
+        return { ...preserved, ...map }
+      })
     }
   }, [])
 
