@@ -84,11 +84,13 @@ export async function POST(req: NextRequest) {
       if (existingProfile) {
         parentId = existingProfile.id
       } else {
-        const { data: newUser, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
+        const { data: newUser, error: createError } = await admin.auth.admin.createUser({
           email,
-          { data: { full_name: parent_name.trim(), role: 'parent' } }
-        )
-        if (inviteError) throw new Error(`Could not invite parent: ${inviteError.message}`)
+          password: '4004',
+          email_confirm: true,
+          user_metadata: { full_name: parent_name.trim(), role: 'parent' },
+        })
+        if (createError) throw new Error(`Could not create parent: ${createError.message}`)
         parentId = newUser.user.id
         isNew = true
 
@@ -115,7 +117,7 @@ export async function POST(req: NextRequest) {
         parent_email,
         status: isNew ? 'created' : 'existing',
         detail: isNew
-          ? 'Invite email sent to parent.'
+          ? 'Account created. Temporary password: 4004'
           : 'Parent account already existed — linked to student.',
       })
     } catch (err: any) {
