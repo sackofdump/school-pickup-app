@@ -1,0 +1,82 @@
+import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { getDistanceMeters } from '@/lib/location'
+
+export async function POST(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { student_id, lat, lng } = await req.json()
+
+  if (!student_id || lat == null || lng == null) {
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+
+  // Verify parent owns this student
+  const { data: link } = await supabase
+    .from('parent_students')
+    .select('student_id')
+    .eq('parent_id', user.id)
+    .eq('student_id', student_id)
+    .single()
+
+  if (!link) {
+    return NextResponse.json({ error: 'Student not linked to your account' }, { status: 403 })
+  }
+
+  // Check school location
+  const { data: settings } = await supabase
+    .from('school_settings')
+    .select('lat, lng, radius_meters')
+    .single()
+
+  let locationVerified = false
+  if (settings) {
+    const distance = getDistanceMeters(lat, lng, settings.lat, settings.lng)
+    locationVerified = distance <= settings.radius_meters
+    if (!locationVerified) {
+      return NextResponse.json({
+        error: `You don't appear to be at school yet. You are ${Math.round(distance)}m away (limit: ${settings.radius_meters}m).`,
+      }, { status: 422 })
+    }
+  }
+
+  // Check if already checked in today
+  const today = new Date().toISOString().split('T')[0]
+  const { data: existing } = await supabase
+    .from('pickup_queue')
+    .select('id, status')
+    .eq('parent_id', user.id)
+    .eq('student_id', student_id)
+    .gte('arrived_at', `${today}T00:00:00`)
+    .single()
+
+  if (existing) {
+    return NextResponse.json({
+      error: existing.status === 'waiting'
+        ? 'You are already in the queue.'
+        : 'This child has already been picked up today.',
+    }, { status: 409 })
+  }
+
+  const { data: entry, error } = await supabase
+    .from('pickup_queue')
+    .insert({
+      student_id,
+      parent_id: user.id,
+      location_verified: locationVerified,
+      status: 'waiting',
+    })
+    .select()
+    .single()
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ entry }, { status: 201 })
+}
