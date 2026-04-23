@@ -1,9 +1,24 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import Image from 'next/image'
 import { getCurrentPosition } from '@/lib/location'
 import { createClient } from '@/lib/supabase/client'
-import type { Student, Profile } from '@/types'
+import type { Profile } from '@/types'
+
+interface School {
+  id: string
+  name: string
+}
+
+interface Student {
+  id: string
+  full_name: string
+  grade: string
+  class_name: string
+  school_id: string | null
+  schools: School | null
+}
 
 interface Props {
   profile: Profile
@@ -21,14 +36,39 @@ function firstName(fullName: string) {
   return fullName.split(' ')[0]
 }
 
+function deriveSchools(students: Student[]): School[] {
+  const seen = new Set<string>()
+  const result: School[] = []
+  for (const s of students) {
+    if (s.school_id && s.schools && !seen.has(s.school_id)) {
+      seen.add(s.school_id)
+      result.push({ id: s.school_id, name: s.schools.name })
+    }
+  }
+  return result
+}
+
 export default function ParentHome({ profile, students, queueMap, initialAbsentIds, pendingRequest: initialPendingRequest }: Props) {
+  const schools = useMemo(() => deriveSchools(students), [students])
+  const multiSchool = schools.length > 1
+
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(
+    multiSchool ? null : (schools[0]?.id ?? null)
+  )
+
+  const visibleStudents = useMemo(() =>
+    selectedSchoolId
+      ? students.filter(s => s.school_id === selectedSchoolId)
+      : students.filter(s => !s.school_id), // fallback: students with no school
+    [students, selectedSchoolId]
+  )
+
   const [statuses, setStatuses] = useState<Record<string, string>>(queueMap)
   const [absentIds] = useState<Set<string>>(new Set(initialAbsentIds))
   const [loading, setLoading] = useState<Record<string, boolean>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [justPickedUp, setJustPickedUp] = useState<Record<string, boolean>>({})
 
-  // Pending request state (when parent has no linked children)
   const [pendingRequest, setPendingRequest] = useState(initialPendingRequest ?? null)
   const [requestFirstName, setRequestFirstName] = useState('')
   const [requestLastName, setRequestLastName] = useState('')
@@ -97,16 +137,12 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
 
     try {
       let lat: number, lng: number
-
       try {
         const pos = await getCurrentPosition()
         lat = pos.coords.latitude
         lng = pos.coords.longitude
       } catch {
-        setErrors(prev => ({
-          ...prev,
-          [student.id]: 'Location access denied. Please enable location and try again.',
-        }))
+        setErrors(prev => ({ ...prev, [student.id]: 'Location access denied. Please enable location and try again.' }))
         return
       }
 
@@ -117,7 +153,6 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
       })
 
       const data = await res.json()
-
       if (!res.ok) {
         setErrors(prev => ({ ...prev, [student.id]: data.error }))
       } else {
@@ -132,7 +167,6 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
     e.preventDefault()
     setRequestLoading(true)
     setRequestError('')
-
     try {
       const res = await fetch('/api/pending-links', {
         method: 'POST',
@@ -152,22 +186,80 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
     }
   }
 
+  // School picker screen
+  if (multiSchool && selectedSchoolId === null) {
+    return (
+      <main className="min-h-screen bg-blue-50 dark:bg-gray-900">
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Image src="/logo.png" alt="PickMeUp Kids" width={100} height={40} className="object-contain" />
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Hi, {profile.full_name}</p>
+          </div>
+          <form action="/api/auth/logout" method="POST">
+            <button className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">Sign out</button>
+          </form>
+        </header>
+
+        <div className="max-w-lg mx-auto p-4 pt-8">
+          <p className="text-base font-semibold text-gray-700 dark:text-gray-300 mb-1">Which school are you picking up from?</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mb-5">You have children at multiple schools.</p>
+
+          <div className="space-y-3">
+            {schools.map(school => (
+              <button
+                key={school.id}
+                onClick={() => setSelectedSchoolId(school.id)}
+                className="w-full bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 active:scale-95 transition-all text-left flex items-center gap-4"
+              >
+                <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-2xl shrink-0">
+                  🏫
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-white">{school.name}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                    {students.filter(s => s.school_id === school.id).map(s => firstName(s.full_name)).join(', ')}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  const selectedSchool = schools.find(s => s.id === selectedSchoolId)
+
   return (
     <main className="min-h-screen bg-blue-50 dark:bg-gray-900">
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-4 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="font-bold text-gray-900 dark:text-white text-lg">School Pickup</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">Hi, {profile.full_name}</p>
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {multiSchool && (
+            <button
+              onClick={() => setSelectedSchoolId(null)}
+              className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-lg leading-none"
+              title="Switch school"
+            >
+              ←
+            </button>
+          )}
+          <Image src="/logo.png" alt="PickMeUp Kids" width={100} height={40} className="object-contain" />
+          {selectedSchool && (
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{selectedSchool.name}</span>
+          )}
         </div>
-        <form action="/api/auth/logout" method="POST">
-          <button className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">Sign out</button>
-        </form>
+        <div className="flex items-center gap-3">
+          <span className="text-gray-500 dark:text-gray-400 text-sm hidden sm:block">Hi, {profile.full_name}</span>
+          <form action="/api/auth/logout" method="POST">
+            <button className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">Sign out</button>
+          </form>
+        </div>
       </header>
 
       <div className="max-w-lg mx-auto p-4 pt-6">
         <h2 className="text-base font-semibold text-gray-700 dark:text-gray-300 mb-3">Your children</h2>
 
-        {students.length === 0 ? (
+        {visibleStudents.length === 0 ? (
           pendingRequest ? (
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 text-center shadow-sm border border-amber-200 dark:border-amber-700">
               <p className="text-4xl mb-3">⏳</p>
@@ -216,7 +308,7 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
           )
         ) : (
           <div className="space-y-3">
-            {students.map(student => {
+            {visibleStudents.map(student => {
               const status = statuses[student.id]
               const isLoading = loading[student.id]
               const error = errors[student.id]
@@ -240,9 +332,7 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
                   </div>
 
                   {error && (
-                    <p className="text-red-500 text-sm bg-red-50 dark:bg-red-900/30 rounded-lg px-3 py-2 mb-3">
-                      {error}
-                    </p>
+                    <p className="text-red-500 text-sm bg-red-50 dark:bg-red-900/30 rounded-lg px-3 py-2 mb-3">{error}</p>
                   )}
 
                   {status === 'waiting' ? (
@@ -283,9 +373,7 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
                             </svg>
                             Checking location…
                           </span>
-                        ) : (
-                          'Check in anyway'
-                        )}
+                        ) : 'Check in anyway'}
                       </button>
                     </div>
                   ) : (
@@ -302,9 +390,7 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
                           </svg>
                           Checking location…
                         </span>
-                      ) : (
-                        "I'm Here! 👋"
-                      )}
+                      ) : "I'm Here! 👋"}
                     </button>
                   )}
                 </div>

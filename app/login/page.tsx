@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
@@ -46,8 +47,9 @@ export default function LoginPage() {
     <main className="min-h-screen bg-blue-50 dark:bg-gray-900 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md w-full max-w-sm p-8">
         <div className="text-center mb-8">
-          <div className="text-5xl mb-3">🏫</div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Bricked Up Pick Up</h1>
+          <div className="flex justify-center mb-3">
+            <Image src="/logo.png" alt="PickMeUp Kids" width={160} height={80} className="object-contain" priority />
+          </div>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Sign in to your account</p>
         </div>
 

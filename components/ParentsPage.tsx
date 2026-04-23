@@ -115,6 +115,9 @@ export default function ParentsPage({ initialParents }: { initialParents: Parent
           {lastAlreadyExisted && (
             <p className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-700 rounded-lg px-3 py-2 mt-2">
               This parent already has an account (they may have children at another school). They've been added to this list — use the link below to connect them to students here.
+              {lastEmailSent
+                ? <span className="ml-1 text-green-600 dark:text-green-400">A notification email was sent to let them know.</span>
+                : null}
             </p>
           )}
           {lastTempPassword && (

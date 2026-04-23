@@ -15,9 +15,10 @@ export default async function ParentPage() {
 
   if (profile?.role !== 'parent') redirect(`/${profile?.role ?? 'login'}`)
 
+  // Join students with their school name
   const { data: links } = await supabase
     .from('parent_students')
-    .select('student_id, students(id, full_name, grade, class_name)')
+    .select('student_id, students(id, full_name, grade, class_name, school_id, schools(id, name))')
     .eq('parent_id', user.id)
 
   const students = (links ?? []).map((l: any) => l.students).filter(Boolean)
@@ -41,7 +42,6 @@ export default async function ParentPage() {
 
   const absentIds = (absenceEntries ?? []).map((a: any) => a.student_id)
 
-  // Fetch pending link request if parent has no linked children
   let pendingRequest = null
   if (students.length === 0) {
     const { data: pending } = await supabase

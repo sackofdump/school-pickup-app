@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 
 interface QueueEntry {
@@ -437,9 +438,12 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Pickup Queue</h1>
-              <p className="text-gray-500 dark:text-gray-400 text-sm">Welcome, {teacherName}</p>
+            <div className="flex items-center gap-3">
+              <Image src="/logo.png" alt="PickMeUp Kids" width={110} height={44} className="object-contain" />
+              <div>
+                <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide font-medium">Pickup Queue</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">Welcome, {teacherName}</p>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3">

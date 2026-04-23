@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
   const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
-  const emailFrom = process.env.EMAIL_FROM ?? 'School Pickup <onboarding@resend.dev>'
+  const emailFrom = process.env.EMAIL_FROM ?? 'PickMeUp Kids <onboarding@resend.dev>'
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
   const results: ImportResult[] = []
@@ -117,10 +117,10 @@ export async function POST(req: NextRequest) {
           await resend.emails.send({
             from: emailFrom,
             to: email,
-            subject: 'Your School Pickup account is ready',
+            subject: 'Your PickMeUp Kids account is ready',
             html: `
               <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
-                <h2 style="color:#1e40af;margin-bottom:8px">Welcome to School Pickup!</h2>
+                <h2 style="color:#1e40af;margin-bottom:8px">Welcome to PickMeUp Kids!</h2>
                 <p style="color:#374151">Hi ${parent_name.trim()},</p>
                 <p style="color:#374151">Your account has been created. Use the details below to sign in${appUrl ? ` at <a href="${appUrl}" style="color:#2563eb">${appUrl}</a>` : ''}.</p>
                 <div style="background:#f3f4f6;border-radius:8px;padding:16px;margin:20px 0">

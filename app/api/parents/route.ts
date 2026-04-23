@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generateTempPassword } from '@/lib/password'
+import { getActiveSchoolId } from '@/lib/active-school'
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 
@@ -21,16 +22,59 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Check if already exists — if so, return their info so admin can link them to students
+  // Check if already exists — if so, notify them about the new school and return their info
   const { data: existing } = await admin.from('profiles').select('id, full_name, email').eq('email', email.trim().toLowerCase()).maybeSingle()
   if (existing) {
+    let emailSent = false
+    let emailError: string | undefined
+
+    const schoolId = await getActiveSchoolId()
+    let schoolName = 'a new school'
+    if (schoolId) {
+      const { data: school } = await admin.from('schools').select('name').eq('id', schoolId).maybeSingle()
+      if (school?.name) schoolName = school.name
+    }
+
+    const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
+    const emailFrom = process.env.EMAIL_FROM ?? 'PickMeUp Kids <onboarding@resend.dev>'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+    const cleanName = existing.full_name ?? ''
+
+    if (!process.env.RESEND_API_KEY) {
+      emailError = 'RESEND_API_KEY not set in environment'
+    } else if (resend) {
+      try {
+        const result = await resend.emails.send({
+          from: emailFrom,
+          to: existing.email,
+          subject: `You've been added to ${schoolName}`,
+          html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+              <h2 style="color:#1e40af;margin-bottom:8px">You've been added to ${schoolName}</h2>
+              <p style="color:#374151">Hi ${cleanName || 'there'},</p>
+              <p style="color:#374151">Your existing PickMeUp Kids account has been linked to <strong>${schoolName}</strong>. You can now see children from this school when you sign in${appUrl ? ` at <a href="${appUrl}" style="color:#2563eb">${appUrl}</a>` : ''}.</p>
+              <p style="color:#374151">Use your existing email and password to log in — no new password needed.</p>
+              <p style="color:#9ca3af;font-size:12px;margin-top:24px">If you weren't expecting this email, please ignore it.</p>
+            </div>
+          `,
+        })
+        if (result.error) {
+          emailError = result.error.message
+        } else {
+          emailSent = true
+        }
+      } catch (err: any) {
+        emailError = err?.message ?? 'Unknown email error'
+      }
+    }
+
     return NextResponse.json({
       id: existing.id,
       email: existing.email,
       full_name: existing.full_name ?? '',
       already_exists: true,
-      email_sent: false,
-      email_error: null,
+      email_sent: emailSent,
+      email_error: emailError ?? null,
     }, { status: 200 })
   }
 
@@ -56,7 +100,7 @@ export async function POST(req: NextRequest) {
 
   // Send welcome email with temp password
   const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
-  const emailFrom = process.env.EMAIL_FROM ?? 'School Pickup <onboarding@resend.dev>'
+  const emailFrom = process.env.EMAIL_FROM ?? 'PickMeUp Kids <onboarding@resend.dev>'
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
   let emailSent = false
 
@@ -69,10 +113,10 @@ export async function POST(req: NextRequest) {
       const result = await resend.emails.send({
         from: emailFrom,
         to: cleanEmail,
-        subject: 'Your School Pickup account is ready',
+        subject: 'Your PickMeUp Kids account is ready',
         html: `
           <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
-            <h2 style="color:#1e40af;margin-bottom:8px">Welcome to School Pickup!</h2>
+            <h2 style="color:#1e40af;margin-bottom:8px">Welcome to PickMeUp Kids!</h2>
             <p style="color:#374151">Hi ${cleanName || 'there'},</p>
             <p style="color:#374151">Your account has been created. Use the details below to sign in${appUrl ? ` at <a href="${appUrl}" style="color:#2563eb">${appUrl}</a>` : ''}.</p>
             <div style="background:#f3f4f6;border-radius:8px;padding:16px;margin:20px 0">

@@ -85,7 +85,7 @@ export async function PATCH(req: NextRequest) {
 
   const parentProfile = requestRow.profiles as any
   const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
-  const emailFrom = process.env.EMAIL_FROM ?? 'School Pickup <onboarding@resend.dev>'
+  const emailFrom = process.env.EMAIL_FROM ?? 'PickMeUp Kids <onboarding@resend.dev>'
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
   if (resend && parentProfile?.email) {
