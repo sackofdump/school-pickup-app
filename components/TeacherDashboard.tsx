@@ -27,19 +27,15 @@ interface Props {
   initialAbsentIds: string[]
 }
 
-function getSuccessMessage() {
-  return new Date().getDay() === 5 ? 'Success! See you Monday!' : 'Success! See you tomorrow!'
-}
-
 export default function TeacherDashboard({ initialQueue, teacherName, allStudents, initialStudentStatuses, initialAbsentIds }: Props) {
   const [queue, setQueue] = useState<QueueEntry[]>(initialQueue)
   const [studentStatuses, setStudentStatuses] = useState<Record<string, 'waiting' | 'picked_up'>>(initialStudentStatuses)
-  const [justPickedUp, setJustPickedUp] = useState<Set<string>>(new Set())
   const [marking, setMarking] = useState<Record<string, boolean>>({})
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarSearch, setSidebarSearch] = useState('')
   const [absentIds, setAbsentIds] = useState<Set<string>>(new Set(initialAbsentIds))
   const [absentLoading, setAbsentLoading] = useState<Record<string, boolean>>({})
+  const [absentError, setAbsentError] = useState<string | null>(null)
   const today = new Date().toISOString().split('T')[0]
 
   // Single stable supabase client instance for this component
@@ -103,7 +99,6 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
       if (entry?.students?.id) {
         const studentId = entry.students.id
         setStudentStatuses(prev => ({ ...prev, [studentId]: 'picked_up' }))
-        setJustPickedUp(prev => new Set(prev).add(studentId))
       }
     }
     setMarking(prev => ({ ...prev, [entryId]: false }))
@@ -111,6 +106,7 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
 
   async function toggleAbsent(studentId: string) {
     setAbsentLoading(prev => ({ ...prev, [studentId]: true }))
+    setAbsentError(null)
     const isAbsent = absentIds.has(studentId)
     const res = await fetch('/api/absences', {
       method: isAbsent ? 'DELETE' : 'POST',
@@ -123,6 +119,9 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
         isAbsent ? next.delete(studentId) : next.add(studentId)
         return next
       })
+    } else {
+      const data = await res.json().catch(() => ({}))
+      setAbsentError(data.error ?? 'Failed to update absence')
     }
     setAbsentLoading(prev => ({ ...prev, [studentId]: false }))
   }
@@ -204,7 +203,7 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
                       onClick={() => toggleAbsent(student.id)}
                       disabled={absentLoading[student.id]}
                       title="Mark absent"
-                      className="opacity-0 group-hover:opacity-100 text-xs text-gray-400 hover:text-orange-500 transition-opacity px-1"
+                      className="text-xs text-gray-300 hover:text-orange-500 active:text-orange-600 transition-colors px-1 disabled:opacity-40"
                     >
                       🤒
                     </button>
@@ -220,9 +219,6 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
                   {student.grade && student.class_name && ' · '}
                   {student.class_name}
                 </p>
-                {isPickedUp && justPickedUp.has(student.id) && (
-                  <p className="text-xs mt-1 text-green-700 font-medium">{getSuccessMessage()}</p>
-                )}
               </div>
             )
           })}
@@ -294,6 +290,12 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
           </div>
         </header>
 
+        {absentError && (
+          <div className="bg-red-50 border-b border-red-200 px-6 py-2 text-sm text-red-600 flex items-center justify-between">
+            <span>{absentError}</span>
+            <button onClick={() => setAbsentError(null)} className="text-red-400 hover:text-red-600 ml-4">✕</button>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto p-6">
           {queue.length === 0 ? (
             <div className="text-center py-24 text-gray-400">
