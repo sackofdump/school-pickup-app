@@ -43,6 +43,15 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
 
   const supabase = useMemo(() => createClient(), [])
 
+  const fetchAbsences = useCallback(async () => {
+    const today = new Date().toISOString().split('T')[0]
+    const { data } = await supabase
+      .from('absences')
+      .select('student_id')
+      .eq('date', today)
+    if (data) setAbsentIds(new Set(data.map(a => a.student_id)))
+  }, [supabase])
+
   const fetchQueue = useCallback(async () => {
     const today = new Date().toISOString().split('T')[0]
 
@@ -74,18 +83,26 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
   }, [supabase])
 
   useEffect(() => {
-    const channel = supabase
+    const queueChannel = supabase
       .channel('pickup_queue_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pickup_queue' }, () => fetchQueue())
       .subscribe()
 
-    const poll = setInterval(fetchQueue, 10000)
+    const absenceChannel = supabase
+      .channel('absences_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'absences' }, () => fetchAbsences())
+      .subscribe()
+
+    const pollQueue = setInterval(fetchQueue, 10000)
+    const pollAbsences = setInterval(fetchAbsences, 10000)
 
     return () => {
-      supabase.removeChannel(channel)
-      clearInterval(poll)
+      supabase.removeChannel(queueChannel)
+      supabase.removeChannel(absenceChannel)
+      clearInterval(pollQueue)
+      clearInterval(pollAbsences)
     }
-  }, [supabase, fetchQueue])
+  }, [supabase, fetchQueue, fetchAbsences])
 
   async function markPickedUp(entryId: string) {
     setMarking(prev => ({ ...prev, [entryId]: true }))

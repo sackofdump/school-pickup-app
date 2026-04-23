@@ -20,25 +20,34 @@ interface Props {
 export default function AbsencesManager({ students: initial, date, backHref }: Props) {
   const [students, setStudents] = useState(initial)
   const [loading, setLoading] = useState<Record<string, boolean>>({})
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
   const absentCount = students.filter(s => s.absent).length
 
   async function toggle(student: Student) {
     setLoading(prev => ({ ...prev, [student.id]: true }))
+    setError(null)
+    try {
+      const res = await fetch('/api/absences', {
+        method: student.absent ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id: student.id, date }),
+      })
 
-    const res = await fetch('/api/absences', {
-      method: student.absent ? 'DELETE' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ student_id: student.id, date }),
-    })
-
-    if (res.ok) {
-      setStudents(prev => prev.map(s =>
-        s.id === student.id ? { ...s, absent: !s.absent } : s
-      ))
+      if (res.ok) {
+        setStudents(prev => prev.map(s =>
+          s.id === student.id ? { ...s, absent: !s.absent } : s
+        ))
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error ?? `Error ${res.status} — could not update absence`)
+      }
+    } catch {
+      setError('Network error — check your connection')
+    } finally {
+      setLoading(prev => ({ ...prev, [student.id]: false }))
     }
-    setLoading(prev => ({ ...prev, [student.id]: false }))
   }
 
   const filtered = students.filter(s =>
@@ -65,6 +74,13 @@ export default function AbsencesManager({ students: initial, date, backHref }: P
             </span>
           )}
         </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 text-sm text-red-600 flex items-center justify-between">
+            <span>⚠️ {error}</span>
+            <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 ml-4">✕</button>
+          </div>
+        )}
 
         <div className="relative mb-4">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
