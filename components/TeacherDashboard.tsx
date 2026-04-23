@@ -161,7 +161,8 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
     const present = searchedStudents.filter(s => !absentIds.has(s.id))
     const absent = searchedStudents.filter(s => absentIds.has(s.id))
 
-    if (sidebarFilter === 'absent') return absent
+    // Absent tab: show all students so you can mark/unmark any of them
+    if (sidebarFilter === 'absent') return [...absent, ...present.sort((a, b) => a.full_name.localeCompare(b.full_name))]
     if (sidebarFilter === 'waiting') return present.filter(s => studentStatuses[s.id] === 'waiting')
     if (sidebarFilter === 'picked_up') return present.filter(s => studentStatuses[s.id] === 'picked_up')
     if (sidebarFilter === 'not_yet') return present.filter(s => !studentStatuses[s.id])
@@ -250,20 +251,22 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
                     {student.full_name}
                   </p>
                   <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => toggleAbsent(student.id)}
-                      disabled={absentLoading[student.id]}
-                      title={isAbsent ? 'Mark present' : 'Mark absent'}
-                      className={`text-xs transition-colors px-1 disabled:opacity-40 ${
-                        isAbsent
-                          ? 'text-orange-400 hover:text-gray-500'
-                          : 'text-gray-300 hover:text-orange-500 active:text-orange-600'
-                      }`}
-                    >
-                      {isAbsent ? '↩' : '🤒'}
-                    </button>
+                    {sidebarFilter === 'absent' && (
+                      <button
+                        onClick={() => toggleAbsent(student.id)}
+                        disabled={absentLoading[student.id]}
+                        title={isAbsent ? 'Mark present' : 'Mark absent'}
+                        className={`text-xs transition-colors px-1 disabled:opacity-40 ${
+                          isAbsent
+                            ? 'text-orange-400 hover:text-gray-500'
+                            : 'text-gray-300 hover:text-orange-500 active:text-orange-600'
+                        }`}
+                      >
+                        {isAbsent ? '↩' : '🤒'}
+                      </button>
+                    )}
                     <span className="text-base">
-                      {isAbsent ? '🤒' : isPickedUp ? '✅' : isWaiting ? '⏳' : '🔴'}
+                      {isAbsent ? '🟠' : isPickedUp ? '✅' : isWaiting ? '⏳' : '🔴'}
                     </span>
                   </div>
                 </div>
