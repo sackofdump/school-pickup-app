@@ -17,18 +17,46 @@ export default async function TeacherPage() {
     redirect('/login')
   }
 
-  // Fetch today's waiting queue
   const today = new Date().toISOString().split('T')[0]
-  const { data: queue } = await supabase
-    .from('pickup_queue')
-    .select(`
-      id, arrived_at, status, location_verified,
-      students(id, full_name, grade, class_name),
-      profiles!pickup_queue_parent_id_fkey(full_name)
-    `)
-    .eq('status', 'waiting')
-    .gte('arrived_at', `${today}T00:00:00`)
-    .order('arrived_at', { ascending: true })
 
-  return <TeacherDashboard initialQueue={(queue ?? []) as any} teacherName={profile.full_name} />
+  const [{ data: queue }, { data: allStudents }, { data: todayEntries }] = await Promise.all([
+    // Waiting queue
+    supabase
+      .from('pickup_queue')
+      .select(`
+        id, arrived_at, status, location_verified,
+        students(id, full_name, grade, class_name),
+        profiles!pickup_queue_parent_id_fkey(full_name)
+      `)
+      .eq('status', 'waiting')
+      .gte('arrived_at', `${today}T00:00:00`)
+      .order('arrived_at', { ascending: true }),
+
+    // All students for sidebar
+    supabase
+      .from('students')
+      .select('id, full_name, grade, class_name')
+      .order('full_name'),
+
+    // Today's queue entries (all statuses) for sidebar colour coding
+    supabase
+      .from('pickup_queue')
+      .select('student_id, status')
+      .gte('arrived_at', `${today}T00:00:00`),
+  ])
+
+  // Build student status map
+  const studentStatusMap: Record<string, 'waiting' | 'picked_up'> = {}
+  for (const e of todayEntries ?? []) {
+    studentStatusMap[e.student_id] = e.status
+  }
+
+  return (
+    <TeacherDashboard
+      initialQueue={(queue ?? []) as any}
+      teacherName={profile.full_name}
+      allStudents={allStudents ?? []}
+      initialStudentStatuses={studentStatusMap}
+    />
+  )
 }
