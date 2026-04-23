@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { generateTempPassword } from '@/lib/password'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -23,11 +24,13 @@ export async function POST(req: NextRequest) {
   const { data: existing } = await admin.from('profiles').select('id').eq('email', email.trim().toLowerCase()).single()
   if (existing) return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 })
 
+  const tempPassword = generateTempPassword()
+
   const { data: newUser, error: createError } = await admin.auth.admin.createUser({
     email: email.trim().toLowerCase(),
-    password: '4004',
+    password: tempPassword,
     email_confirm: true,
-    user_metadata: { full_name: full_name?.trim() ?? '', role: 'parent' },
+    user_metadata: { full_name: full_name?.trim() ?? '', role: 'parent', must_change_password: true },
   })
 
   if (createError) return NextResponse.json({ error: createError.message }, { status: 500 })
@@ -39,5 +42,5 @@ export async function POST(req: NextRequest) {
     role: 'parent',
   })
 
-  return NextResponse.json({ id: newUser.user.id, email, full_name }, { status: 201 })
+  return NextResponse.json({ id: newUser.user.id, email, full_name, temp_password: tempPassword }, { status: 201 })
 }

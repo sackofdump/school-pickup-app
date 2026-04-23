@@ -115,7 +115,7 @@ export default function ImportPage() {
           </code>
           <p className="text-blue-600 text-xs mt-3">
             Multiple rows with the same student but different parents are supported.
-            Existing accounts won't be duplicated. Parents will receive an invite email to set their password.
+            Existing accounts won't be duplicated. New accounts get a unique temporary password shown in the results — no email is sent.
           </p>
         </div>
 
@@ -217,7 +217,7 @@ export default function ImportPage() {
             <div className="px-5 py-4 border-b border-gray-100">
               <p className="font-semibold text-gray-800">Import complete</p>
               <div className="flex gap-4 mt-1 text-sm">
-                {createdCount > 0 && <span className="text-green-600">✓ {createdCount} invited</span>}
+                {createdCount > 0 && <span className="text-green-600">✓ {createdCount} created</span>}
                 {existingCount > 0 && <span className="text-blue-600">↩ {existingCount} already existed</span>}
                 {errorCount > 0 && <span className="text-red-500">✗ {errorCount} errors</span>}
               </div>
@@ -230,6 +230,7 @@ export default function ImportPage() {
                     <th className="px-4 py-3 text-left">#</th>
                     <th className="px-4 py-3 text-left">Student</th>
                     <th className="px-4 py-3 text-left">Parent Email</th>
+                    <th className="px-4 py-3 text-left">Temp Password</th>
                     <th className="px-4 py-3 text-left">Result</th>
                   </tr>
                 </thead>
@@ -239,6 +240,12 @@ export default function ImportPage() {
                       <td className="px-4 py-3 text-gray-400">{r.row}</td>
                       <td className="px-4 py-3 font-medium text-gray-900">{r.student_name}</td>
                       <td className="px-4 py-3 text-gray-600">{r.parent_email}</td>
+                      <td className="px-4 py-3">
+                        {r.temp_password
+                          ? <code className="bg-amber-50 text-amber-800 border border-amber-200 rounded px-1.5 py-0.5 text-xs font-bold">{r.temp_password}</code>
+                          : <span className="text-gray-300 text-xs">—</span>
+                        }
+                      </td>
                       <td className="px-4 py-3">
                         {r.status === 'created' && <span className="text-green-600 text-xs">✓ {r.detail}</span>}
                         {r.status === 'existing' && <span className="text-blue-600 text-xs">↩ {r.detail}</span>}

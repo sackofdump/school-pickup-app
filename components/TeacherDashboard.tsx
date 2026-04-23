@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 interface QueueEntry {
@@ -27,12 +27,14 @@ interface Props {
   initialAbsentIds: string[]
 }
 
+function getSuccessMessage() {
+  return new Date().getDay() === 5 ? 'Success! See you Monday!' : 'Success! See you tomorrow!'
+}
+
 export default function TeacherDashboard({ initialQueue, teacherName, allStudents, initialStudentStatuses, initialAbsentIds }: Props) {
   const [queue, setQueue] = useState<QueueEntry[]>(initialQueue)
-  const clearedStatuses = Object.fromEntries(
-    Object.entries(initialStudentStatuses).filter(([, v]) => v !== 'picked_up')
-  ) as Record<string, 'waiting' | 'picked_up'>
-  const [studentStatuses, setStudentStatuses] = useState<Record<string, 'waiting' | 'picked_up'>>(clearedStatuses)
+  const [studentStatuses, setStudentStatuses] = useState<Record<string, 'waiting' | 'picked_up'>>(initialStudentStatuses)
+  const [justPickedUp, setJustPickedUp] = useState<Set<string>>(new Set())
   const [marking, setMarking] = useState<Record<string, boolean>>({})
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarSearch, setSidebarSearch] = useState('')
@@ -40,12 +42,11 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
   const [absentLoading, setAbsentLoading] = useState<Record<string, boolean>>({})
   const today = new Date().toISOString().split('T')[0]
 
-  // TODO: remove clearedRef before going live — tracks students reset by 30s timer
-  const clearedRef = useRef<Set<string>>(new Set())
+  // Single stable supabase client instance for this component
+  const supabase = useMemo(() => createClient(), [])
 
   const fetchQueue = useCallback(async () => {
     const today = new Date().toISOString().split('T')[0]
-    const supabase = createClient()
 
     const [{ data: queueData }, { data: entries }] = await Promise.all([
       supabase
@@ -68,22 +69,26 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
     if (entries) {
       const map: Record<string, 'waiting' | 'picked_up'> = {}
       for (const e of entries) {
-        // TODO: remove clearedRef check before going live
-        if (clearedRef.current.has(e.student_id)) continue
         map[e.student_id] = e.status
       }
       setStudentStatuses(map)
     }
-  }, [])
+  }, [supabase])
 
   useEffect(() => {
-    const supabase = createClient()
     const channel = supabase
       .channel('pickup_queue_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pickup_queue' }, () => fetchQueue())
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [fetchQueue])
+
+    // Polling fallback every 10s in case real-time WebSocket drops
+    const poll = setInterval(fetchQueue, 10000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(poll)
+    }
+  }, [supabase, fetchQueue])
 
   async function markPickedUp(entryId: string) {
     setMarking(prev => ({ ...prev, [entryId]: true }))
@@ -95,17 +100,10 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
     })
     if (res.ok) {
       setQueue(prev => prev.filter(e => e.id !== entryId))
-      // TODO: remove this timeout before going live
       if (entry?.students?.id) {
         const studentId = entry.students.id
-        setTimeout(() => {
-          clearedRef.current.add(studentId)
-          setStudentStatuses(prev => {
-            const next = { ...prev }
-            delete next[studentId]
-            return next
-          })
-        }, 30000)
+        setStudentStatuses(prev => ({ ...prev, [studentId]: 'picked_up' }))
+        setJustPickedUp(prev => new Set(prev).add(studentId))
       }
     }
     setMarking(prev => ({ ...prev, [entryId]: false }))
@@ -143,7 +141,16 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
     s.class_name?.toLowerCase().includes(sidebarSearch.toLowerCase())
   )
 
-  const presentStudents = filteredStudents.filter(s => !absentIds.has(s.id))
+  const statusOrder = (id: string) => {
+    const s = studentStatuses[id]
+    if (s === 'waiting') return 0
+    if (s === 'picked_up') return 1
+    return 2
+  }
+
+  const presentStudents = filteredStudents
+    .filter(s => !absentIds.has(s.id))
+    .sort((a, b) => statusOrder(a.id) - statusOrder(b.id))
   const absentStudents = filteredStudents.filter(s => absentIds.has(s.id))
 
   const pickedUpCount = Object.values(studentStatuses).filter(s => s === 'picked_up').length
@@ -213,6 +220,9 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
                   {student.grade && student.class_name && ' · '}
                   {student.class_name}
                 </p>
+                {isPickedUp && justPickedUp.has(student.id) && (
+                  <p className="text-xs mt-1 text-green-700 font-medium">{getSuccessMessage()}</p>
+                )}
               </div>
             )
           })}

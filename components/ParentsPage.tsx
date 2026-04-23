@@ -17,6 +17,7 @@ export default function ParentsPage({ initialParents }: { initialParents: Parent
   const [email, setEmail] = useState('')
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState('')
+  const [lastTempPassword, setLastTempPassword] = useState('')
 
   async function addParent(e: React.FormEvent) {
     e.preventDefault()
@@ -40,6 +41,7 @@ export default function ParentsPage({ initialParents }: { initialParents: Parent
         created_at: new Date().toISOString(),
         parent_students: [],
       }])
+      setLastTempPassword(data.temp_password ?? '')
       setName('')
       setEmail('')
     }
@@ -84,7 +86,12 @@ export default function ParentsPage({ initialParents }: { initialParents: Parent
             </button>
           </form>
           {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-          <p className="text-xs text-gray-400 mt-2">Temporary password: <code className="bg-gray-100 px-1 rounded">4004</code></p>
+          {lastTempPassword && (
+            <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mt-2">
+              Account created! Temporary password: <code className="font-bold">{lastTempPassword}</code>
+              <span className="text-green-500 ml-1">— share this with the parent</span>
+            </p>
+          )}
         </div>
 
         {/* Parent list */}

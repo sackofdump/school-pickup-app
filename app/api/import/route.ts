@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { generateTempPassword } from '@/lib/password'
 import { NextRequest, NextResponse } from 'next/server'
 
 export interface ImportRow {
@@ -16,6 +17,7 @@ export interface ImportResult {
   parent_email: string
   status: 'created' | 'existing' | 'error'
   detail: string
+  temp_password?: string
 }
 
 export async function POST(req: NextRequest) {
@@ -81,14 +83,16 @@ export async function POST(req: NextRequest) {
       let parentId: string
       let isNew = false
 
+      let tempPassword: string | undefined
       if (existingProfile) {
         parentId = existingProfile.id
       } else {
+        tempPassword = generateTempPassword()
         const { data: newUser, error: createError } = await admin.auth.admin.createUser({
           email,
-          password: '4004',
+          password: tempPassword,
           email_confirm: true,
-          user_metadata: { full_name: parent_name.trim(), role: 'parent' },
+          user_metadata: { full_name: parent_name.trim(), role: 'parent', must_change_password: true },
         })
         if (createError) throw new Error(`Could not create parent: ${createError.message}`)
         parentId = newUser.user.id
@@ -117,8 +121,9 @@ export async function POST(req: NextRequest) {
         parent_email,
         status: isNew ? 'created' : 'existing',
         detail: isNew
-          ? 'Account created. Temporary password: 4004'
+          ? 'Account created'
           : 'Parent account already existed — linked to student.',
+        temp_password: isNew ? tempPassword : undefined,
       })
     } catch (err: any) {
       results.push({

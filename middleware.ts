@@ -51,6 +51,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
+  // Force password change on first login
+  if (pathname !== '/change-password' && !pathname.startsWith('/api/')) {
+    if (user.user_metadata?.must_change_password === true) {
+      return NextResponse.redirect(new URL('/change-password', request.url))
+    }
+  }
+
   return supabaseResponse
 }
 
