@@ -178,15 +178,8 @@ export default function ParentHome({ profile, students, queueMap }: Props) {
                     <div className={`rounded-xl px-4 py-4 text-center ${isNew ? 'bg-green-500' : 'bg-green-50'}`}>
                       <p className="text-3xl mb-1">{isNew ? '🎉' : '✅'}</p>
                       <p className={`font-bold text-sm ${isNew ? 'text-white' : 'text-green-700'}`}>
-                        {isNew
-                          ? getSuccessMessage()
-                          : `${student.full_name} has been picked up today.`}
+                        {isNew ? getSuccessMessage() : `${student.full_name} has been picked up today.`}
                       </p>
-                      {isNew && (
-                        <p className="text-green-100 text-xs mt-1">
-                          Come on through — {student.full_name} is on the way out.
-                        </p>
-                      )}
                     </div>
                   ) : (
                     <button
