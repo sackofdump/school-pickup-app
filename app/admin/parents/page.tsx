@@ -46,19 +46,21 @@ export default async function ParentsPage() {
                   </span>
                 </div>
 
-                {children.length > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {children.map((c: any, i: number) => (
-                      <span key={i} className="bg-blue-50 text-blue-700 text-xs rounded-full px-3 py-1">
-                        {c.full_name}
-                        {c.grade && ` · Grade ${c.grade}`}
-                        {c.class_name && ` · ${c.class_name}`}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-400 mt-2 italic">No children linked</p>
-                )}
+                <div className="mt-3 flex flex-wrap gap-2 items-center">
+                  {children.map((c: any, i: number) => (
+                    <span key={i} className="bg-blue-50 text-blue-700 text-xs rounded-full px-3 py-1">
+                      {c.full_name}
+                      {c.grade && ` · Grade ${c.grade}`}
+                      {c.class_name && ` · ${c.class_name}`}
+                    </span>
+                  ))}
+                  <Link
+                    href={`/admin/parents/${parent.id}/link`}
+                    className="text-xs text-blue-500 hover:text-blue-700 hover:underline italic"
+                  >
+                    {children.length === 0 ? 'No children linked — click to add' : '+ add more'}
+                  </Link>
+                </div>
               </div>
             )
           })}
