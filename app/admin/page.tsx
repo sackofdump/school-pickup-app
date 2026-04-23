@@ -32,14 +32,14 @@ export default async function AdminPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <Link href="/admin/students" className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:border-blue-300 transition-colors">
             <p className="text-3xl font-bold text-blue-600">{studentCount ?? 0}</p>
             <p className="text-gray-600 text-sm mt-1">Students</p>
-          </div>
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          </Link>
+          <Link href="/admin/parents" className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:border-green-300 transition-colors">
             <p className="text-3xl font-bold text-green-600">{parentCount ?? 0}</p>
             <p className="text-gray-600 text-sm mt-1">Parents</p>
-          </div>
+          </Link>
         </div>
 
         <div className="grid gap-4">
