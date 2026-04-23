@@ -151,3 +151,27 @@ create policy "Admins manage settings"
 -- Enable Realtime for live teacher dashboard
 -- ============================================================
 alter publication supabase_realtime add table public.pickup_queue;
+
+-- ============================================================
+-- Absences (run separately if schema was already applied)
+-- ============================================================
+create table public.absences (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references public.students(id) on delete cascade,
+  date date not null default current_date,
+  note text,
+  created_by uuid references public.profiles(id),
+  unique (student_id, date)
+);
+
+alter table public.absences enable row level security;
+
+create policy "Teachers and admins manage absences"
+  on public.absences for all
+  using (current_user_role() in ('teacher', 'admin'));
+
+create policy "Absences are readable by teachers and admins"
+  on public.absences for select
+  using (current_user_role() in ('teacher', 'admin'));
+
+alter publication supabase_realtime add table public.absences;

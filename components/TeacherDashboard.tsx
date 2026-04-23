@@ -24,9 +24,10 @@ interface Props {
   teacherName: string
   allStudents: Student[]
   initialStudentStatuses: Record<string, 'waiting' | 'picked_up'>
+  initialAbsentIds: string[]
 }
 
-export default function TeacherDashboard({ initialQueue, teacherName, allStudents, initialStudentStatuses }: Props) {
+export default function TeacherDashboard({ initialQueue, teacherName, allStudents, initialStudentStatuses, initialAbsentIds }: Props) {
   const [queue, setQueue] = useState<QueueEntry[]>(initialQueue)
   const clearedStatuses = Object.fromEntries(
     Object.entries(initialStudentStatuses).filter(([, v]) => v !== 'picked_up')
@@ -35,6 +36,9 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
   const [marking, setMarking] = useState<Record<string, boolean>>({})
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarSearch, setSidebarSearch] = useState('')
+  const [absentIds, setAbsentIds] = useState<Set<string>>(new Set(initialAbsentIds))
+  const [absentLoading, setAbsentLoading] = useState<Record<string, boolean>>({})
+  const today = new Date().toISOString().split('T')[0]
 
   // TODO: remove clearedRef before going live — tracks students reset by 30s timer
   const clearedRef = useRef<Set<string>>(new Set())
@@ -107,6 +111,24 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
     setMarking(prev => ({ ...prev, [entryId]: false }))
   }
 
+  async function toggleAbsent(studentId: string) {
+    setAbsentLoading(prev => ({ ...prev, [studentId]: true }))
+    const isAbsent = absentIds.has(studentId)
+    const res = await fetch('/api/absences', {
+      method: isAbsent ? 'DELETE' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: studentId, date: today }),
+    })
+    if (res.ok) {
+      setAbsentIds(prev => {
+        const next = new Set(prev)
+        isAbsent ? next.delete(studentId) : next.add(studentId)
+        return next
+      })
+    }
+    setAbsentLoading(prev => ({ ...prev, [studentId]: false }))
+  }
+
   function formatTime(iso: string) {
     return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
@@ -120,6 +142,9 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
     s.grade?.toLowerCase().includes(sidebarSearch.toLowerCase()) ||
     s.class_name?.toLowerCase().includes(sidebarSearch.toLowerCase())
   )
+
+  const presentStudents = filteredStudents.filter(s => !absentIds.has(s.id))
+  const absentStudents = filteredStudents.filter(s => absentIds.has(s.id))
 
   const pickedUpCount = Object.values(studentStatuses).filter(s => s === 'picked_up').length
   const waitingCount = Object.values(studentStatuses).filter(s => s === 'waiting').length
@@ -146,7 +171,8 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
         </div>
 
         <div className="overflow-y-auto flex-1 p-2 space-y-1">
-          {filteredStudents.map(student => {
+          {/* Present students */}
+          {presentStudents.map(student => {
             const status = studentStatuses[student.id]
             const isPickedUp = status === 'picked_up'
             const isWaiting = status === 'waiting'
@@ -154,12 +180,10 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
             return (
               <div
                 key={student.id}
-                className={`rounded-lg px-3 py-2.5 border transition-colors ${
-                  isPickedUp
-                    ? 'bg-green-50 border-green-200'
-                    : isWaiting
-                    ? 'bg-amber-50 border-amber-200'
-                    : 'bg-red-50 border-red-200'
+                className={`group rounded-lg px-3 py-2.5 border transition-colors ${
+                  isPickedUp ? 'bg-green-50 border-green-200'
+                  : isWaiting ? 'bg-amber-50 border-amber-200'
+                  : 'bg-red-50 border-red-200'
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -168,9 +192,19 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
                   }`}>
                     {student.full_name}
                   </p>
-                  <span className="text-base">
-                    {isPickedUp ? '✅' : isWaiting ? '⏳' : '🔴'}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => toggleAbsent(student.id)}
+                      disabled={absentLoading[student.id]}
+                      title="Mark absent"
+                      className="opacity-0 group-hover:opacity-100 text-xs text-gray-400 hover:text-orange-500 transition-opacity px-1"
+                    >
+                      🤒
+                    </button>
+                    <span className="text-base">
+                      {isPickedUp ? '✅' : isWaiting ? '⏳' : '🔴'}
+                    </span>
+                  </div>
                 </div>
                 <p className={`text-xs mt-0.5 ${
                   isPickedUp ? 'text-green-600' : isWaiting ? 'text-amber-600' : 'text-red-500'
@@ -182,6 +216,37 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
               </div>
             )
           })}
+
+          {/* Absent students — bottom of list */}
+          {absentStudents.length > 0 && (
+            <>
+              <div className="pt-2 pb-1">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">
+                  🤒 Absent ({absentStudents.length})
+                </p>
+              </div>
+              {absentStudents.map(student => (
+                <div key={student.id} className="group rounded-lg px-3 py-2.5 border bg-gray-50 border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-sm text-gray-400 line-through">{student.full_name}</p>
+                    <button
+                      onClick={() => toggleAbsent(student.id)}
+                      disabled={absentLoading[student.id]}
+                      title="Undo absent"
+                      className="text-xs text-gray-300 hover:text-gray-600 transition-colors"
+                    >
+                      ↩
+                    </button>
+                  </div>
+                  <p className="text-xs mt-0.5 text-gray-300">
+                    {student.grade && `Grade ${student.grade}`}
+                    {student.grade && student.class_name && ' · '}
+                    {student.class_name}
+                  </p>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </aside>
 
@@ -207,6 +272,12 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
             <span className="bg-blue-100 text-blue-800 font-bold text-sm px-3 py-1.5 rounded-full">
               {queue.length} waiting
             </span>
+            <a
+              href="/admin/absences"
+              className="text-sm text-orange-500 hover:text-orange-700 border border-orange-200 rounded-lg px-3 py-1.5 hover:bg-orange-50 transition-colors"
+            >
+              🤒 Absent
+            </a>
             <form action="/api/auth/logout" method="POST">
               <button className="text-sm text-gray-400 hover:text-gray-600">Sign out</button>
             </form>

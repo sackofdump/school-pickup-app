@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /c/schoolapp && gh auth status 2>&1)",
+      "Bash(cd:*)",
+      "Bash(cd /c/schoolapp && gh repo create schoolapp --public --source=. --remote=origin --push 2>&1)",
+      "Bash(cd /c/schoolapp && gh repo create school-pickup-app --public --source=. --remote=origin --push 2>&1)",
+      "Bash(git add:*)"
+    ]
+  }
+}
