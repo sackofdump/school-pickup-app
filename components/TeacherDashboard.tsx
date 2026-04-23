@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 interface QueueEntry {
@@ -28,7 +28,6 @@ interface Props {
 
 export default function TeacherDashboard({ initialQueue, teacherName, allStudents, initialStudentStatuses }: Props) {
   const [queue, setQueue] = useState<QueueEntry[]>(initialQueue)
-  // TODO: remove the filter before going live — clears picked_up on load for testing
   const clearedStatuses = Object.fromEntries(
     Object.entries(initialStudentStatuses).filter(([, v]) => v !== 'picked_up')
   ) as Record<string, 'waiting' | 'picked_up'>
@@ -36,6 +35,9 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
   const [marking, setMarking] = useState<Record<string, boolean>>({})
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarSearch, setSidebarSearch] = useState('')
+
+  // TODO: remove clearedRef before going live — tracks students reset by 30s timer
+  const clearedRef = useRef<Set<string>>(new Set())
 
   const fetchQueue = useCallback(async () => {
     const today = new Date().toISOString().split('T')[0]
@@ -61,18 +63,12 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
     if (queueData) setQueue(queueData as unknown as QueueEntry[])
     if (entries) {
       const map: Record<string, 'waiting' | 'picked_up'> = {}
-      // TODO: remove the picked_up filter before going live
       for (const e of entries) {
-        if (e.status !== 'picked_up') map[e.student_id] = e.status
+        // TODO: remove clearedRef check before going live
+        if (clearedRef.current.has(e.student_id)) continue
+        map[e.student_id] = e.status
       }
-      setStudentStatuses(prev => {
-        // Preserve any picked_up entries that still have a 30s timer running
-        const preserved: Record<string, 'waiting' | 'picked_up'> = {}
-        for (const [k, v] of Object.entries(prev)) {
-          if (v === 'picked_up') preserved[k] = v
-        }
-        return { ...preserved, ...map }
-      })
+      setStudentStatuses(map)
     }
   }, [])
 
@@ -99,6 +95,7 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
       if (entry?.students?.id) {
         const studentId = entry.students.id
         setTimeout(() => {
+          clearedRef.current.add(studentId)
           setStudentStatuses(prev => {
             const next = { ...prev }
             delete next[studentId]
@@ -134,7 +131,7 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
       <aside className={`${sidebarOpen ? 'w-72' : 'w-0'} transition-all duration-300 overflow-hidden shrink-0 bg-white border-r border-gray-200 flex flex-col`}>
         <div className="p-4 border-b border-gray-100">
           <p className="font-semibold text-gray-800 text-sm mb-1">All Students</p>
-          <div className="flex gap-2 text-xs mb-3">
+          <div className="flex gap-2 text-xs mb-3 flex-wrap">
             <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{pickedUpCount} picked up</span>
             <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{waitingCount} waiting</span>
             <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{allStudents.length - pickedUpCount - waitingCount} not yet</span>
