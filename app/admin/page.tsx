@@ -35,7 +35,7 @@ export default async function AdminPage() {
     return (
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 flex items-center justify-center">
         <div className="text-center max-w-sm">
-          <p className="text-4xl mb-4">🏫</p>
+          <div className="flex justify-center mb-4"><img src="/logo.png" alt="PickMeUp Kids" className="h-16 object-contain" /></div>
           <p className="text-xl font-bold text-gray-800 dark:text-white mb-2">No school selected</p>
           <p className="text-gray-500 dark:text-gray-400 text-sm">Use the school switcher above to create or select a school.</p>
         </div>

@@ -211,8 +211,8 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
                 onClick={() => setSelectedSchoolId(school.id)}
                 className="w-full bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 active:scale-95 transition-all text-left flex items-center gap-4"
               >
-                <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-2xl shrink-0">
-                  🏫
+                <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/60 flex items-center justify-center shrink-0 overflow-hidden p-1">
+                  <Image src="/logo.png" alt="" width={40} height={40} className="object-contain" />
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900 dark:text-white">{school.name}</p>
