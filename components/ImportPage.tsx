@@ -115,7 +115,7 @@ export default function ImportPage() {
           </code>
           <p className="text-blue-600 text-xs mt-3">
             Multiple rows with the same student but different parents are supported.
-            Existing accounts won't be duplicated. New accounts get a unique temporary password shown in the results — no email is sent.
+            Existing accounts won't be duplicated. New accounts get a unique temporary password and are sent a welcome email automatically.
           </p>
         </div>
 
