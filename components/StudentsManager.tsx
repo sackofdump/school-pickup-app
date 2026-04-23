@@ -180,10 +180,15 @@ export default function StudentsManager({ students: initialStudents, parents }: 
                           key={p!.id}
                           className="bg-blue-50 text-blue-700 text-xs rounded-full px-3 py-1 flex items-center gap-1"
                         >
-                          {p!.full_name}
+                          <span>
+                            <span className="font-medium">{p!.full_name || p!.email}</span>
+                            {p!.full_name && (
+                              <span className="text-blue-400 ml-1">({p!.email})</span>
+                            )}
+                          </span>
                           <button
                             onClick={() => unlinkParent(student.id, p!.id)}
-                            className="text-blue-400 hover:text-blue-700 font-bold"
+                            className="text-blue-400 hover:text-red-500 font-bold ml-1"
                           >
                             ×
                           </button>
