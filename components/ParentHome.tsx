@@ -75,6 +75,10 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
   const [requestLoading, setRequestLoading] = useState(false)
   const [requestError, setRequestError] = useState('')
 
+  const [modePromptStudentId, setModePromptStudentId] = useState<string | null>(null)
+  const [pickupModes, setPickupModes] = useState<Record<string, 'driving' | 'walking'>>({})
+  const [modeLoading, setModeLoading] = useState(false)
+
   const supabase = useMemo(() => createClient(), [])
 
   const fetchStatuses = useCallback(async () => {
@@ -157,10 +161,23 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
         setErrors(prev => ({ ...prev, [student.id]: data.error }))
       } else {
         setStatuses(prev => ({ ...prev, [student.id]: 'waiting' }))
+        setModePromptStudentId(student.id)
       }
     } finally {
       setLoading(prev => ({ ...prev, [student.id]: false }))
     }
+  }
+
+  async function handleModeSelect(studentId: string, mode: 'driving' | 'walking') {
+    setModeLoading(true)
+    setPickupModes(prev => ({ ...prev, [studentId]: mode }))
+    await fetch('/api/checkin', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: studentId, pickup_mode: mode }),
+    })
+    setModeLoading(false)
+    setModePromptStudentId(null)
   }
 
   async function handleRequestSubmit(e: React.FormEvent) {
@@ -336,13 +353,24 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
                   )}
 
                   {status === 'waiting' ? (
-                    <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/30 rounded-xl px-4 py-3">
-                      <span className="text-amber-500 text-lg">⏳</span>
-                      <div>
-                        <p className="font-semibold text-amber-700 dark:text-amber-400 text-sm">You're in the queue!</p>
-                        <p className="text-amber-600 dark:text-amber-500 text-xs">
-                          <span className="font-medium">{firstName(student.full_name)}</span> will be out shortly.
-                        </p>
+                    <div className="bg-amber-50 dark:bg-amber-900/30 rounded-xl px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-500 text-lg">⏳</span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-amber-700 dark:text-amber-400 text-sm">You're in the queue!</p>
+                          <p className="text-amber-600 dark:text-amber-500 text-xs">
+                            <span className="font-medium">{firstName(student.full_name)}</span> will be out shortly.
+                          </p>
+                        </div>
+                        {pickupModes[student.id] && (
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                            pickupModes[student.id] === 'walking'
+                              ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
+                              : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                          }`}>
+                            {pickupModes[student.id] === 'walking' ? '🚶 Walking' : '🚗 Driving'}
+                          </span>
+                        )}
                       </div>
                     </div>
                   ) : status === 'picked_up' ? (
@@ -403,6 +431,38 @@ export default function ParentHome({ profile, students, queueMap, initialAbsentI
           Your location is only used to confirm you're at school.
         </p>
       </div>
+
+      {/* Pickup mode bottom sheet */}
+      {modePromptStudentId && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setModePromptStudentId(null)} />
+          <div className="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-t-3xl px-6 pt-6 pb-10 shadow-2xl">
+            <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-6" />
+            <p className="text-lg font-bold text-gray-900 dark:text-white text-center mb-1">How are you picking up?</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6">This helps staff direct your child to the right spot.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => handleModeSelect(modePromptStudentId, 'driving')}
+                disabled={modeLoading}
+                className="flex flex-col items-center gap-2 bg-blue-50 dark:bg-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 active:scale-95 border-2 border-blue-200 dark:border-blue-700 rounded-2xl py-6 transition-all disabled:opacity-50"
+              >
+                <span className="text-4xl">🚗</span>
+                <span className="font-semibold text-blue-700 dark:text-blue-300">Driving</span>
+                <span className="text-xs text-blue-500 dark:text-blue-400">Car pickup line</span>
+              </button>
+              <button
+                onClick={() => handleModeSelect(modePromptStudentId, 'walking')}
+                disabled={modeLoading}
+                className="flex flex-col items-center gap-2 bg-purple-50 dark:bg-purple-900/40 hover:bg-purple-100 dark:hover:bg-purple-900/60 active:scale-95 border-2 border-purple-200 dark:border-purple-700 rounded-2xl py-6 transition-all disabled:opacity-50"
+              >
+                <span className="text-4xl">🚶</span>
+                <span className="font-semibold text-purple-700 dark:text-purple-300">Walking</span>
+                <span className="text-xs text-purple-500 dark:text-purple-400">Pickup gate / on foot</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

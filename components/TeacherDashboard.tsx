@@ -9,6 +9,7 @@ interface QueueEntry {
   arrived_at: string
   status: string
   location_verified: boolean
+  pickup_mode: 'driving' | 'walking' | null
   students: { id: string; full_name: string; grade: string; class_name: string } | null
   profiles: { full_name: string } | null
 }
@@ -530,11 +531,22 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
                           {!isStudentAbsent && waited >= 5 && <span className="text-amber-500 ml-1">· Waiting {waited}m</span>}
                         </p>
                       </div>
-                      {entry.location_verified && (
-                        <span className="text-green-600 dark:text-green-400 text-xs bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded-full shrink-0">
-                          📍 Verified
-                        </span>
-                      )}
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        {entry.pickup_mode === 'walking' ? (
+                          <span className="text-purple-700 dark:text-purple-300 text-xs bg-purple-50 dark:bg-purple-900/30 px-2 py-1 rounded-full">
+                            🚶 Walking
+                          </span>
+                        ) : entry.pickup_mode === 'driving' ? (
+                          <span className="text-blue-700 dark:text-blue-300 text-xs bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-full">
+                            🚗 Driving
+                          </span>
+                        ) : null}
+                        {entry.location_verified && (
+                          <span className="text-green-600 dark:text-green-400 text-xs bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded-full">
+                            📍 Verified
+                          </span>
+                        )}
+                      </div>
                       <button
                         onClick={() => markPickedUp(entry.id)}
                         disabled={marking[entry.id]}

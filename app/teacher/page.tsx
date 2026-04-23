@@ -24,7 +24,7 @@ export default async function TeacherPage() {
   const queueQuery = supabase
     .from('pickup_queue')
     .select(`
-      id, arrived_at, status, location_verified,
+      id, arrived_at, status, location_verified, pickup_mode,
       students(id, full_name, grade, class_name),
       profiles!pickup_queue_parent_id_fkey(full_name)
     `)

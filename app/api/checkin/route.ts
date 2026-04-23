@@ -108,3 +108,24 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ entry }, { status: 201 })
 }
+
+export async function PATCH(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { student_id, pickup_mode } = await req.json()
+  if (!student_id || !pickup_mode) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+  if (!['driving', 'walking'].includes(pickup_mode)) return NextResponse.json({ error: 'Invalid mode' }, { status: 400 })
+
+  const today = new Date().toISOString().split('T')[0]
+  const { error } = await supabase
+    .from('pickup_queue')
+    .update({ pickup_mode })
+    .eq('parent_id', user.id)
+    .eq('student_id', student_id)
+    .gte('arrived_at', `${today}T00:00:00`)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
