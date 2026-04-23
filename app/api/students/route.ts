@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getActiveSchoolId } from '@/lib/active-school'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -9,12 +10,15 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  const schoolId = await getActiveSchoolId()
+  if (!schoolId) return NextResponse.json({ error: 'No school selected' }, { status: 400 })
+
   const { full_name, grade, class_name } = await req.json()
   if (!full_name) return NextResponse.json({ error: 'Name required' }, { status: 400 })
 
   const { data, error } = await supabase
     .from('students')
-    .insert({ full_name, grade, class_name })
+    .insert({ full_name, grade, class_name, school_id: schoolId })
     .select()
     .single()
 

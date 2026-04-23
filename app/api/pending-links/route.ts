@@ -10,12 +10,11 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await supabase.from('profiles').select('role, full_name, email').eq('id', user.id).single()
   if (profile?.role !== 'parent') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { child_first_name, child_last_name } = await req.json()
+  const { child_first_name, child_last_name, school_id } = await req.json()
   if (!child_first_name?.trim() || !child_last_name?.trim()) {
     return NextResponse.json({ error: 'Child first and last name are required.' }, { status: 400 })
   }
 
-  // Check for existing pending request
   const { data: existing } = await supabase
     .from('pending_student_requests')
     .select('id')
@@ -33,6 +32,7 @@ export async function POST(req: NextRequest) {
       parent_id: user.id,
       child_first_name: child_first_name.trim(),
       child_last_name: child_last_name.trim(),
+      school_id: school_id ?? null,
     })
     .select()
     .single()
@@ -42,7 +42,6 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ request }, { status: 201 })
 }
 
-// Admin: approve or reject a request
 export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -71,10 +70,8 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  // Approve: link parent to student
   if (!student_id) return NextResponse.json({ error: 'student_id required to approve' }, { status: 400 })
 
-  // Create the link
   const { error: linkErr } = await supabase
     .from('parent_students')
     .upsert({ parent_id: requestRow.parent_id, student_id })
@@ -86,7 +83,6 @@ export async function PATCH(req: NextRequest) {
     .update({ status: 'approved', resolved_at: new Date().toISOString(), resolved_by: user.id })
     .eq('id', id)
 
-  // Send confirmation email
   const parentProfile = requestRow.profiles as any
   const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
   const emailFrom = process.env.EMAIL_FROM ?? 'School Pickup <onboarding@resend.dev>'

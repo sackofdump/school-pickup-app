@@ -27,12 +27,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Student not linked to your account' }, { status: 403 })
   }
 
-  // Check against all configured school locations
-  const { data: locations } = await supabase
-    .from('school_locations')
-    .select('lat, lng, radius_meters, name')
+  // Get the student's school
+  const { data: student } = await supabase
+    .from('students')
+    .select('school_id')
+    .eq('id', student_id)
+    .single()
 
-  // Fall back to legacy school_settings if no locations configured yet
+  const schoolId = (student as any)?.school_id ?? null
+
+  // Check against all locations for this school (or all locations if no school)
+  let locationsQuery = supabase.from('school_locations').select('lat, lng, radius_meters, name')
+  if (schoolId) locationsQuery = locationsQuery.eq('school_id', schoolId)
+
+  const { data: locations } = await locationsQuery
+
   let locationVerified = false
   if (locations && locations.length > 0) {
     for (const loc of locations) {
@@ -52,11 +61,7 @@ export async function POST(req: NextRequest) {
     }
   } else {
     // Fallback to legacy school_settings
-    const { data: settings } = await supabase
-      .from('school_settings')
-      .select('lat, lng, radius_meters')
-      .single()
-
+    const { data: settings } = await supabase.from('school_settings').select('lat, lng, radius_meters').single()
     if (settings) {
       const distance = getDistanceMeters(lat, lng, settings.lat, settings.lng)
       locationVerified = distance <= settings.radius_meters
@@ -92,6 +97,7 @@ export async function POST(req: NextRequest) {
       parent_id: user.id,
       location_verified: locationVerified,
       status: 'waiting',
+      school_id: schoolId,
     })
     .select()
     .single()

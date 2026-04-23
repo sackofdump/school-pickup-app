@@ -181,6 +181,34 @@ create policy "Absences are readable by teachers and admins"
 alter publication supabase_realtime add table public.absences;
 
 -- ============================================================
+-- Schools (multi-school support)
+-- ============================================================
+create table if not exists public.schools (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  created_at timestamptz default now()
+);
+
+alter table public.schools enable row level security;
+
+create policy "Authenticated users read schools"
+  on public.schools for select
+  using (auth.uid() is not null);
+
+create policy "Admins manage schools"
+  on public.schools for all
+  using (current_user_role() = 'admin');
+
+-- Add school_id to key tables (nullable for backward compat)
+alter table public.students add column if not exists school_id uuid references public.schools(id) on delete set null;
+alter table public.pickup_queue add column if not exists school_id uuid references public.schools(id) on delete set null;
+alter table public.profiles add column if not exists school_id uuid references public.schools(id) on delete set null;
+
+-- After creating your first school, run this to migrate existing students:
+-- UPDATE public.students SET school_id = '<your-school-uuid>' WHERE school_id IS NULL;
+-- UPDATE public.pickup_queue SET school_id = '<your-school-uuid>' WHERE school_id IS NULL;
+
+-- ============================================================
 -- School Locations (multiple pickup zones)
 -- Run this migration after initial schema if needed.
 -- ============================================================
@@ -203,9 +231,11 @@ create policy "Admins manage locations"
   on public.school_locations for all
   using (current_user_role() = 'admin');
 
+alter table public.school_locations add column if not exists school_id uuid references public.schools(id) on delete cascade;
+
 -- Migrate existing school_settings row into school_locations (run once)
--- insert into public.school_locations (name, lat, lng, radius_meters)
--- select name, lat, lng, radius_meters from public.school_settings where lat != 0;
+-- insert into public.school_locations (name, lat, lng, radius_meters, school_id)
+-- select name, lat, lng, radius_meters, '<your-school-uuid>' from public.school_settings where lat != 0;
 
 -- ============================================================
 -- Pending student link requests
@@ -216,6 +246,7 @@ create table if not exists public.pending_student_requests (
   child_first_name text not null,
   child_last_name text not null,
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  school_id uuid references public.schools(id) on delete set null,
   created_at timestamptz default now(),
   resolved_at timestamptz,
   resolved_by uuid references public.profiles(id)

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getActiveSchoolId } from '@/lib/active-school'
 import PendingRequestsManager from '@/components/PendingRequestsManager'
 
 export default async function PendingRequestsPage() {
@@ -10,15 +11,20 @@ export default async function PendingRequestsPage() {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') redirect('/login')
 
+  const schoolId = await getActiveSchoolId()
+  if (!schoolId) redirect('/admin')
+
   const [{ data: requests }, { data: students }] = await Promise.all([
     supabase
       .from('pending_student_requests')
       .select('id, child_first_name, child_last_name, status, created_at, profiles(full_name, email)')
       .eq('status', 'pending')
+      .eq('school_id', schoolId)
       .order('created_at', { ascending: true }),
     supabase
       .from('students')
       .select('id, full_name, grade, class_name')
+      .eq('school_id', schoolId)
       .order('full_name'),
   ])
 

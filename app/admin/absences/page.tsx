@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getActiveSchoolId } from '@/lib/active-school'
 import AbsencesManager from '@/components/AbsencesManager'
 
 export default async function AbsencesPage() {
@@ -12,8 +13,20 @@ export default async function AbsencesPage() {
 
   const today = new Date().toISOString().split('T')[0]
 
+  // For admin use active school; teachers use their assigned school
+  let schoolId: string | null = null
+  if (profile?.role === 'admin') {
+    schoolId = await getActiveSchoolId()
+  } else {
+    const { data: teacherProfile } = await supabase.from('profiles').select('school_id').eq('id', user.id).single()
+    schoolId = (teacherProfile as any)?.school_id ?? null
+  }
+
+  const studentsQuery = supabase.from('students').select('id, full_name, grade, class_name').order('full_name')
+  if (schoolId) studentsQuery.eq('school_id', schoolId)
+
   const [{ data: students }, { data: absences }] = await Promise.all([
-    supabase.from('students').select('id, full_name, grade, class_name').order('full_name'),
+    studentsQuery,
     supabase.from('absences').select('id, student_id, date, note').eq('date', today),
   ])
 

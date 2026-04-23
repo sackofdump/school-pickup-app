@@ -104,20 +104,20 @@ export default function TeacherDashboard({ initialQueue, teacherName, allStudent
   useEffect(() => {
     const queueChannel = supabase
       .channel('pickup_queue_changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pickup_queue' }, (payload) => {
-        const newId = (payload.new as { id: string }).id
-        setNewEntryIds(prev => new Set([...prev, newId]))
-        setTimeout(() => {
-          setNewEntryIds(prev => {
-            const next = new Set(prev)
-            next.delete(newId)
-            return next
-          })
-        }, 3000)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pickup_queue' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newId = (payload.new as { id: string }).id
+          setNewEntryIds(prev => new Set([...prev, newId]))
+          setTimeout(() => {
+            setNewEntryIds(prev => {
+              const next = new Set(prev)
+              next.delete(newId)
+              return next
+            })
+          }, 3000)
+        }
         fetchQueue()
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pickup_queue' }, () => fetchQueue())
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'pickup_queue' }, () => fetchQueue())
       .subscribe()
 
     const absenceChannel = supabase

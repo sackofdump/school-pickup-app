@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getActiveSchoolId } from '@/lib/active-school'
 import Link from 'next/link'
 import ResetQueueButton from '@/components/ResetQueueButton'
 
@@ -16,11 +17,31 @@ export default async function AdminPage() {
 
   if (profile?.role !== 'admin') redirect('/login')
 
+  const schoolId = await getActiveSchoolId()
+
   const [{ count: studentCount }, { count: parentCount }, { count: pendingCount }] = await Promise.all([
-    supabase.from('students').select('*', { count: 'exact', head: true }),
-    supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'parent'),
-    supabase.from('pending_student_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    schoolId
+      ? supabase.from('students').select('*', { count: 'exact', head: true }).eq('school_id', schoolId)
+      : { count: 0 },
+    schoolId
+      ? supabase.from('profiles').select('*, parent_students!inner(students!inner(school_id))', { count: 'exact', head: true }).eq('role', 'parent').eq('parent_students.students.school_id', schoolId)
+      : { count: 0 },
+    schoolId
+      ? supabase.from('pending_student_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending').eq('school_id', schoolId)
+      : { count: 0 },
   ])
+
+  if (!schoolId) {
+    return (
+      <main className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 flex items-center justify-center">
+        <div className="text-center max-w-sm">
+          <p className="text-4xl mb-4">🏫</p>
+          <p className="text-xl font-bold text-gray-800 dark:text-white mb-2">No school selected</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Use the school switcher above to create or select a school.</p>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
@@ -45,10 +66,7 @@ export default async function AdminPage() {
         </div>
 
         <div className="grid gap-4">
-          <Link
-            href="/admin/students"
-            className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
-          >
+          <Link href="/admin/students" className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-blue-300 dark:hover:border-blue-600 transition-colors">
             <div className="flex items-center gap-3">
               <span className="text-2xl">👦</span>
               <div>
@@ -59,10 +77,7 @@ export default async function AdminPage() {
             <span className="text-gray-400 dark:text-gray-500">›</span>
           </Link>
 
-          <Link
-            href="/admin/parents"
-            className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-green-300 dark:hover:border-green-600 transition-colors"
-          >
+          <Link href="/admin/parents" className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-green-300 dark:hover:border-green-600 transition-colors">
             <div className="flex items-center gap-3">
               <span className="text-2xl">👨‍👩‍👧</span>
               <div>
@@ -73,10 +88,7 @@ export default async function AdminPage() {
             <span className="text-gray-400 dark:text-gray-500">›</span>
           </Link>
 
-          <Link
-            href="/admin/pending-requests"
-            className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-purple-300 dark:hover:border-purple-600 transition-colors"
-          >
+          <Link href="/admin/pending-requests" className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-purple-300 dark:hover:border-purple-600 transition-colors">
             <div className="flex items-center gap-3">
               <span className="text-2xl">🔗</span>
               <div>
@@ -86,18 +98,13 @@ export default async function AdminPage() {
             </div>
             <div className="flex items-center gap-2">
               {(pendingCount ?? 0) > 0 && (
-                <span className="bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                  {pendingCount}
-                </span>
+                <span className="bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{pendingCount}</span>
               )}
               <span className="text-gray-400 dark:text-gray-500">›</span>
             </div>
           </Link>
 
-          <Link
-            href="/admin/absences"
-            className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-orange-300 dark:hover:border-orange-600 transition-colors"
-          >
+          <Link href="/admin/absences" className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-orange-300 dark:hover:border-orange-600 transition-colors">
             <div className="flex items-center gap-3">
               <span className="text-2xl">🤒</span>
               <div>
@@ -108,10 +115,7 @@ export default async function AdminPage() {
             <span className="text-gray-400 dark:text-gray-500">›</span>
           </Link>
 
-          <Link
-            href="/admin/import"
-            className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
-          >
+          <Link href="/admin/import" className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-blue-300 dark:hover:border-blue-600 transition-colors">
             <div className="flex items-center gap-3">
               <span className="text-2xl">📥</span>
               <div>
@@ -122,10 +126,7 @@ export default async function AdminPage() {
             <span className="text-gray-400 dark:text-gray-500">›</span>
           </Link>
 
-          <Link
-            href="/admin/settings"
-            className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
-          >
+          <Link href="/admin/settings" className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-blue-300 dark:hover:border-blue-600 transition-colors">
             <div className="flex items-center gap-3">
               <span className="text-2xl">📍</span>
               <div>
@@ -146,10 +147,7 @@ export default async function AdminPage() {
 function LogoutButton() {
   return (
     <form action="/api/auth/logout" method="POST">
-      <button
-        type="submit"
-        className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2"
-      >
+      <button type="submit" className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2">
         Sign out
       </button>
     </form>

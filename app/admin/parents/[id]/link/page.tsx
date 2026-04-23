@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getActiveSchoolId } from '@/lib/active-school'
 import LinkStudentPage from '@/components/LinkStudentPage'
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
@@ -9,13 +10,16 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('profiles').select('role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') redirect('/login')
+
+  const schoolId = await getActiveSchoolId()
 
   const [{ data: parent }, { data: students }, { data: linked }] = await Promise.all([
     supabase.from('profiles').select('id, full_name, email').eq('id', parentId).single(),
-    supabase.from('students').select('id, full_name, grade, class_name').order('full_name'),
+    schoolId
+      ? supabase.from('students').select('id, full_name, grade, class_name').eq('school_id', schoolId).order('full_name')
+      : supabase.from('students').select('id, full_name, grade, class_name').order('full_name'),
     supabase.from('parent_students').select('student_id').eq('parent_id', parentId),
   ])
 
