@@ -21,15 +21,23 @@ export async function POST(req: NextRequest) {
   if (!email) return NextResponse.json({ error: 'Email required' }, { status: 400 })
 
   const admin = createAdminClient()
+  const schoolId = await getActiveSchoolId()
 
   // Check if already exists — if so, notify them about the new school and return their info
   const { data: existing } = await admin.from('profiles').select('id, full_name, email').eq('email', email.trim().toLowerCase()).maybeSingle()
   if (existing) {
+    // Add to school roster so they stay visible even with no students linked yet
+    if (schoolId) {
+      await admin.from('school_parents').upsert(
+        { school_id: schoolId, parent_id: existing.id },
+        { onConflict: 'school_id,parent_id' }
+      )
+    }
+
     let emailSent = false
     let emailError: string | undefined
-
-    const schoolId = await getActiveSchoolId()
     let schoolName = 'a new school'
+
     if (schoolId) {
       const { data: school } = await admin.from('schools').select('name').eq('id', schoolId).maybeSingle()
       if (school?.name) schoolName = school.name
@@ -98,12 +106,19 @@ export async function POST(req: NextRequest) {
     role: 'parent',
   })
 
+  // Add to school roster
+  if (schoolId) {
+    await admin.from('school_parents').upsert(
+      { school_id: schoolId, parent_id: newUser.user.id },
+      { onConflict: 'school_id,parent_id' }
+    )
+  }
+
   // Send welcome email with temp password
   const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
   const emailFrom = process.env.EMAIL_FROM ?? 'PickMeUp Kids <onboarding@resend.dev>'
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
   let emailSent = false
-
   let emailError: string | undefined
 
   if (!process.env.RESEND_API_KEY) {

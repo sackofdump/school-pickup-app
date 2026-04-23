@@ -14,32 +14,23 @@ export default async function Page() {
   const schoolId = await getActiveSchoolId()
   if (!schoolId) redirect('/admin')
 
-  // Get parents who have at least one student in this school
-  const { data: schoolStudents } = await supabase
-    .from('students')
-    .select('id')
+  // Get all parents registered for this school (via school_parents roster)
+  const { data: rosterLinks } = await supabase
+    .from('school_parents')
+    .select('parent_id')
     .eq('school_id', schoolId)
 
-  const studentIds = (schoolStudents ?? []).map(s => s.id)
+  const rosterParentIds = (rosterLinks ?? []).map((r: any) => r.parent_id)
 
   let parents: any[] = []
-  if (studentIds.length > 0) {
-    const { data: parentLinks } = await supabase
-      .from('parent_students')
-      .select('parent_id')
-      .in('student_id', studentIds)
-
-    const parentIds = [...new Set((parentLinks ?? []).map((l: any) => l.parent_id))]
-
-    if (parentIds.length > 0) {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, created_at, parent_students(student_id, students(full_name, grade, class_name))')
-        .in('id', parentIds)
-        .eq('role', 'parent')
-        .order('full_name')
-      parents = data ?? []
-    }
+  if (rosterParentIds.length > 0) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, created_at, parent_students(student_id, students(full_name, grade, class_name))')
+      .in('id', rosterParentIds)
+      .eq('role', 'parent')
+      .order('full_name')
+    parents = data ?? []
   }
 
   return <ParentsPage initialParents={parents as any} />

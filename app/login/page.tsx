@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
@@ -39,7 +40,14 @@ export default function LoginPage() {
       .eq('id', user.id)
       .single()
 
-    router.push(`/${profile?.role ?? 'parent'}`)
+    const rolePathMap: Record<string, string> = {
+      admin: '/admin',
+      teacher: '/teacher',
+      parent: '/parent',
+      absenceAdmin: '/absence-admin',
+    }
+    const role = profile?.role ?? 'parent'
+    router.push(rolePathMap[role] ?? `/${role}`)
     router.refresh()
   }
 
@@ -96,6 +104,12 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
+
+        <div className="mt-5 text-center">
+          <Link href="/forgot-password" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+            Forgot your password?
+          </Link>
+        </div>
       </div>
     </main>
   )

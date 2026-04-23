@@ -14,7 +14,7 @@ interface Student {
 interface Props {
   students: Student[]
   date: string
-  backHref: string
+  backHref: string | null
 }
 
 export default function AbsencesManager({ students: initial, date, backHref }: Props) {
@@ -89,7 +89,7 @@ export default function AbsencesManager({ students: initial, date, backHref }: P
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <Link href={backHref} className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">←</Link>
+          {backHref && <Link href={backHref} className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">←</Link>}
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Absent Today</h1>
             <p className="text-gray-500 dark:text-gray-400 text-sm">{new Date(date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>

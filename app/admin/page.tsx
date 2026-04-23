@@ -104,6 +104,17 @@ export default async function AdminPage() {
             </div>
           </Link>
 
+          <Link href="/admin/teachers" className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-blue-300 dark:hover:border-blue-600 transition-colors">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">👩‍🏫</span>
+              <div>
+                <p className="font-semibold text-gray-800 dark:text-gray-100">Manage Teachers</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">View teacher accounts and school assignments</p>
+              </div>
+            </div>
+            <span className="text-gray-400 dark:text-gray-500">›</span>
+          </Link>
+
           <Link href="/admin/absences" className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:border-orange-300 dark:hover:border-orange-600 transition-colors">
             <div className="flex items-center gap-3">
               <span className="text-2xl">🤒</span>

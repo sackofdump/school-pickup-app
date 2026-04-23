@@ -31,9 +31,17 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  const rolePathMap: Record<string, string> = {
+    admin: '/admin',
+    teacher: '/teacher',
+    parent: '/parent',
+    absenceAdmin: '/absence-admin',
+  }
+
   // Public routes
-  if (pathname === '/login') {
-    if (user) {
+  const publicPaths = ['/login', '/forgot-password', '/auth/callback', '/reset-password']
+  if (publicPaths.includes(pathname) || pathname.startsWith('/auth/')) {
+    if (user && pathname === '/login') {
       // Already logged in — redirect to role-based home
       const { data: profile } = await supabase
         .from('profiles')
@@ -41,7 +49,7 @@ export async function middleware(request: NextRequest) {
         .eq('id', user.id)
         .single()
       const role = profile?.role ?? 'parent'
-      return NextResponse.redirect(new URL(`/${role}`, request.url))
+      return NextResponse.redirect(new URL(rolePathMap[role] ?? `/${role}`, request.url))
     }
     return supabaseResponse
   }
