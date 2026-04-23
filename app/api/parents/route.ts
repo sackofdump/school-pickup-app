@@ -21,9 +21,18 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Check if already exists
-  const { data: existing } = await admin.from('profiles').select('id').eq('email', email.trim().toLowerCase()).single()
-  if (existing) return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 })
+  // Check if already exists — if so, return their info so admin can link them to students
+  const { data: existing } = await admin.from('profiles').select('id, full_name, email').eq('email', email.trim().toLowerCase()).maybeSingle()
+  if (existing) {
+    return NextResponse.json({
+      id: existing.id,
+      email: existing.email,
+      full_name: existing.full_name ?? '',
+      already_exists: true,
+      email_sent: false,
+      email_error: null,
+    }, { status: 200 })
+  }
 
   const tempPassword = generateTempPassword()
   const cleanEmail = email.trim().toLowerCase()
